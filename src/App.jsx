@@ -1,8 +1,15 @@
+import { BrowserRouter } from 'react-router-dom'
+import AppRoutes from '@/router'
+
+/**
+ * App - BrowserRouter 최상위 래퍼
+ * 라우트 설정은 src/router/index.jsx 참고
+ */
 function App() {
   return (
-    <div>
-      <h1>Travel Checklist App</h1>
-    </div>
+    <BrowserRouter>
+      <AppRoutes />
+    </BrowserRouter>
   )
 }
 
