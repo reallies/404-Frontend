@@ -1,7 +1,9 @@
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { IMAGES } from '@/images/constants'
 import WeatherOverlayCard from '@/images/WeatherOverlayCard'
 import { FEATURE_CARDS, FOOTER_SECTIONS, FOOTER_BOTTOM_LINKS } from '@/mocks/homeData'
+import AiPlannerFab from '@/components/common/AiPlannerFab'
 
 /* ─────────────────────────────────────────────
    원형 진행률 SVG (모바일 Progress Card)
@@ -48,8 +50,19 @@ function CircularProgress({ percent = 85, size = 64 }) {
 /* ─────────────────────────────────────────────
    메인 컴포넌트
 ───────────────────────────────────────────── */
+const SLIDE_INTERVAL = 5000
+const HERO_SLIDES = IMAGES.home.heroSlides
+
 function HomePage() {
   const navigate = useNavigate()
+  const [currentSlide, setCurrentSlide] = useState(0)
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % HERO_SLIDES.length)
+    }, SLIDE_INTERVAL)
+    return () => clearInterval(timer)
+  }, [])
 
   return (
     <div className="bg-white">
@@ -134,7 +147,7 @@ function HomePage() {
           }}
         />
 
-        {/* 오른쪽: 풀블리드 이미지 (왼→오 페이드) */}
+        {/* 오른쪽: 풀블리드 이미지 슬라이드쇼 (왼→오 페이드) */}
         <div
           className="absolute top-0 right-0 w-[55%] h-full"
           style={{
@@ -142,12 +155,16 @@ function HomePage() {
             maskImage: 'linear-gradient(to right, transparent 0%, rgba(0,0,0,0.3) 20%, rgba(0,0,0,0.7) 40%, black 60%)',
           }}
         >
-          <img
-            src={IMAGES.home.heroDesktop}
-            alt="산악 풍경"
-            className="w-full h-full object-cover"
-            loading="eager"
-          />
+          {HERO_SLIDES.map((src, idx) => (
+            <img
+              key={src}
+              src={src}
+              alt={`여행 풍경 ${idx + 1}`}
+              className="absolute inset-0 w-full h-full object-cover transition-opacity duration-[1500ms] ease-in-out"
+              style={{ opacity: idx === currentSlide ? 1 : 0 }}
+              loading={idx === 0 ? 'eager' : 'lazy'}
+            />
+          ))}
         </div>
 
         {/* 이미지 위 오버레이 카드 */}
@@ -167,16 +184,15 @@ function HomePage() {
               Editorial Curation
             </span>
             <h1 className="text-5xl font-extrabold text-gray-900 leading-tight mb-5">
-              디지털 큐레이션으로<br />완성하는<br />완벽한 여행
+            여행은 가는데…<br />준비는 안 했죠?
             </h1>
             <p className="text-gray-500 text-base leading-relaxed mb-8 max-w-md">
-              별별있는 준비는 없습니다. 각 필요한 분활이 집중하세요. 아키
-              텍트의 기능적 시스템이으로 그 다음 쪽지를 지워 최적의 체크리
-              스트를 찾겠습니다.
+            찾기만 하고 끝나는 여행 준비는 그만<br />
+            저장부터 체크까지 한 번에 체크리스트로 여행 준비를 완성하세요.
             </p>
             <div className="flex items-center gap-4">
               <button
-                onClick={() => navigate('/trips')}
+                onClick={() => navigate('/trips/new/step2')}
                 className="text-white font-semibold text-sm px-6 py-3 rounded-xl transition-all shadow-md hover:shadow-lg hover:scale-[1.03]"
                 style={{ background: 'linear-gradient(135deg, #06B6D4, #8B5CF6)' }}
               >
@@ -349,7 +365,7 @@ function HomePage() {
           </h2>
           <p className="text-gray-500 text-sm mb-8">당신의 첫 번째 큐레이션이 지금 시작됩니다.</p>
           <button
-            onClick={() => navigate('/trips')}
+            onClick={() => navigate('/trips/new/step2')}
             className="bg-cyan-500 hover:bg-cyan-600 text-white font-semibold text-sm px-8 py-4 rounded-xl transition-colors shadow-sm"
           >
             자동 저장하고 나중에 확인하기
@@ -369,7 +385,7 @@ function HomePage() {
         {/* 모바일 CTA */}
         <div className="md:hidden px-5">
           <button
-            onClick={() => navigate('/trips')}
+            onClick={() => navigate('/trips/new/step2')}
             className="w-full bg-cyan-500 hover:bg-cyan-600 text-white font-bold text-base py-4 rounded-2xl transition-colors flex items-center justify-center gap-2 shadow-sm"
           >
             Start Planning Now
@@ -426,6 +442,8 @@ function HomePage() {
         </div>
       </footer>
 
+      {/* AI 플래너 FAB (화면 고정) */}
+      <AiPlannerFab />
     </div>
   )
 }

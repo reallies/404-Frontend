@@ -11,7 +11,7 @@ function Header() {
   const navigate = useNavigate()
 
   return (
-    <header className="sticky top-0 z-50 w-full bg-white border-b border-gray-100">
+    <header className="z-50 w-full bg-white border-b border-gray-100">
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
 
         {/* 로고 */}

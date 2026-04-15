@@ -10,6 +10,13 @@ export const IMAGES = {
   home: {
     heroDesktop:
       'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?q=80&w=900&auto=format&fit=crop',
+    heroSlides: [
+      'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?q=80&w=900&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1506929562872-bb421503ef21?q=80&w=900&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=900&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?q=80&w=900&auto=format&fit=crop',
+      'https://images.unsplash.com/photo-1530789253388-582c481c54b0?q=80&w=900&auto=format&fit=crop',
+    ],
     heroMobile:
       'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?q=80&w=600&auto=format&fit=crop',
     product1:

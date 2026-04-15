@@ -5,6 +5,9 @@ import HomePage from '@/pages/HomePage'
 import LoginPage from '@/pages/LoginPage'
 import TripListPage from '@/pages/TripListPage'
 import TripNewPage from '@/pages/TripNewPage'
+import TripNewStep2Page from '@/pages/TripNewStep2Page'
+import TripNewStep3Page from '@/pages/TripNewStep3Page'
+import TripNewStep4Page from '@/pages/TripNewStep4Page'
 import TripLoadingPage from '@/pages/TripLoadingPage'
 import TripSearchPage from '@/pages/TripSearchPage'
 import TripChecklistPage from '@/pages/TripChecklistPage'
@@ -42,6 +45,9 @@ const AppRoutes = () => {
         { path: '/login',               element: <LoginPage /> },
         { path: '/trips',               element: <TripListPage /> },
         { path: '/trips/new',           element: <TripNewPage /> },
+        { path: '/trips/new/step2',     element: <TripNewStep2Page /> },
+        { path: '/trips/new/step3',     element: <TripNewStep3Page /> },
+        { path: '/trips/new/step4',     element: <TripNewStep4Page /> },
         { path: '/trips/:id/search',    element: <TripSearchPage /> },
         { path: '/trips/:id/checklist', element: <TripChecklistPage /> },
         { path: '/404',                 element: <NotFoundPage /> },
