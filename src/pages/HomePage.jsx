@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { IMAGES } from '@/images/constants'
 import { FEATURE_CARDS, FOOTER_SECTIONS, FOOTER_BOTTOM_LINKS } from '@/mocks/homeData'
 import AiPlannerFab from '@/components/common/AiPlannerFab'
@@ -51,6 +51,22 @@ function CircularProgress({ percent = 85, size = 64 }) {
 ───────────────────────────────────────────── */
 const SLIDE_INTERVAL = 5000
 const HERO_SLIDES = IMAGES.home.heroSlides
+
+/** 문의하기 · 개인정보 · 약관 — 푸터/모바일 하단 공통 */
+function LegalFooterLinks({ className = '' }) {
+  return (
+    <nav className={className} aria-label="법적 안내">
+      {FOOTER_BOTTOM_LINKS.map((link, idx) => (
+        <span key={link.label} className="inline-flex items-center gap-x-2">
+          {idx > 0 && <span className="text-gray-200 select-none" aria-hidden>|</span>}
+          <a href={link.href} className="hover:text-gray-600 transition-colors">
+            {link.label}
+          </a>
+        </span>
+      ))}
+    </nav>
+  )
+}
 
 function HomePage() {
   const navigate = useNavigate()
@@ -207,10 +223,12 @@ function HomePage() {
       <section className="hidden md:block bg-white py-16">
         <div className="mx-auto max-w-6xl px-6 text-center">
           <h2 className="text-3xl font-extrabold text-gray-900 mb-4">
-            여행 준비의 스트레스를<br />창조적인 경험으로
+            여행 준비를 빠짐없이,<br />
+            한곳에서 완성하세요
           </h2>
-          <p className="text-gray-500 text-base max-w-xl mx-auto">
-            인증되진 베이스캠프전에를 넘어서 나만의 시스템으로 분석 부여할 수 있는 4코스를에서 찾겠습니다.
+          <p className="text-gray-500 text-base max-w-xl mx-auto leading-relaxed">
+            항공·일정을 바탕으로 필요한 준비물과 방문 동선을 정리하고, 출발 전까지 체크리스트로 확인할 수 있도록 돕습니다. 흩어진
+            메모와 검색에 그치지 않고, 저장부터 확인까지 이어지는 준비 흐름을 제공합니다.
           </p>
         </div>
       </section>
@@ -313,69 +331,57 @@ function HomePage() {
       </section>
 
       {/* ══════════════════════════════════
-          [DESKTOP ONLY] 에디토리얼 섹션
+          [DESKTOP ONLY] 여행 준비 흐름 소개
       ══════════════════════════════════ */}
-      <section className="hidden md:block bg-gray-50 py-14">
-        <div className="mx-auto max-w-6xl px-6 flex items-center gap-12">
-          <div className="flex-1">
-            <p className="text-xs font-semibold tracking-widest text-gray-400 uppercase mb-3">
-              Editorial Approach
-            </p>
-            <h2 className="text-2xl font-extrabold text-gray-900 mb-4">
-              준비를 넘어선 큐레이션
+      <section className="hidden md:block bg-gradient-to-b from-gray-50 to-white py-16">
+        <div className="mx-auto max-w-6xl px-6 flex flex-col lg:flex-row lg:items-center gap-12 lg:gap-16">
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold tracking-widest text-teal-600/90 mb-3">여행 준비 흐름</p>
+            <h2 className="text-2xl md:text-[26px] font-extrabold text-gray-900 mb-4 leading-snug">
+              항공·일정을 넣으면
+              <br />
+              준비물과 동선이 정리됩니다
             </h2>
-            <p className="text-sm text-gray-500 leading-relaxed mb-6 max-w-sm">
-              우리는 현 일필 특색 (To-do-list)의 한의력에서 브레이크를 넘었습니다. 편역에 이름이 있는 서비스는 살 두려 저장됩니다 여행 이름이 있는 단 사 계있으로 여러행 과정합니다 정확하 이렇게합니다.
+            <p className="text-sm text-gray-600 leading-relaxed mb-6 max-w-md">
+              목적지와 여행 기간에 맞춰 필요한 준비 항목을 골라 담고, 동네·일정별로 나눠 볼 수 있습니다. 저장해 둔 가이드는
+              보관함에서 다시 열고, 출발 전에는 체크리스트로 빠짐없이 확인하세요.
             </p>
-            <button className="text-sm font-semibold text-cyan-500 hover:text-cyan-600 flex items-center gap-1 transition-colors">
-              더 보이보기
+            <button
+              type="button"
+              onClick={() => navigate('/trips/new/step2')}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-teal-600 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-teal-700"
+            >
+              여행 준비 시작하기
               <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z" />
               </svg>
             </button>
           </div>
 
-          <div className="flex gap-4 flex-shrink-0">
-            <div className="w-36 h-44 rounded-2xl overflow-hidden shadow-sm">
-              <img src={IMAGES.home.product1} alt="여행 가방" className="w-full h-full object-cover" loading="lazy" />
+          <div className="flex justify-center lg:justify-end gap-5 flex-shrink-0">
+            <div className="w-40 h-52 sm:w-44 sm:h-56 rounded-2xl overflow-hidden shadow-lg ring-1 ring-black/5">
+              <img
+                src={IMAGES.home.editorial1}
+                alt="여행 일정과 준비물을 정리하는 모습"
+                className="h-full w-full object-cover"
+                loading="lazy"
+              />
             </div>
-            <div className="w-36 h-44 rounded-2xl overflow-hidden shadow-sm mt-6">
-              <img src={IMAGES.home.product2} alt="카메라" className="w-full h-full object-cover" loading="lazy" />
+            <div className="w-40 h-52 sm:w-44 sm:h-56 rounded-2xl overflow-hidden shadow-lg ring-1 ring-black/5 mt-8 sm:mt-10">
+              <img
+                src={IMAGES.home.editorial2}
+                alt="목적지와 동선을 확인하는 지도"
+                className="h-full w-full object-cover"
+                loading="lazy"
+              />
             </div>
           </div>
         </div>
       </section>
 
-      {/* ══════════════════════════════════
-          CTA 섹션 (데스크탑/모바일 공용)
-      ══════════════════════════════════ */}
-      <section className="bg-white py-10 md:py-20">
-        {/* 데스크탑 CTA */}
-        <div className="hidden md:block text-center mx-auto max-w-xl px-6">
-          <h2 className="text-3xl font-extrabold text-gray-900 mb-3">
-            준비 루틴을 시작할까요?
-          </h2>
-          <p className="text-gray-500 text-sm mb-8">당신의 첫 번째 큐레이션이 지금 시작됩니다.</p>
-          <button
-            onClick={() => navigate('/trips/new/step2')}
-            className="bg-cyan-500 hover:bg-cyan-600 text-white font-semibold text-sm px-8 py-4 rounded-xl transition-colors shadow-sm"
-          >
-            자동 저장하고 나중에 확인하기
-          </button>
-          <div className="mt-5 flex items-center justify-center gap-6">
-            {FOOTER_BOTTOM_LINKS.map((link, idx) => (
-              <span key={link.label} className="contents">
-                {idx > 0 && <span className="text-gray-200">|</span>}
-                <a href={link.href} className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
-                  {link.label}
-                </a>
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {/* 모바일 CTA */}
-        <div className="md:hidden px-5">
+      {/* 모바일 전용: 하단 주요 이동 (데스크톱은 히어로·피처 등에서 진입) */}
+      <section className="md:hidden bg-white py-8">
+        <div className="px-5">
           <button
             onClick={() => navigate('/trips/new/step2')}
             className="w-full bg-cyan-500 hover:bg-cyan-600 text-white font-bold text-base py-4 rounded-2xl transition-colors flex items-center justify-center gap-2 shadow-sm"
@@ -393,27 +399,35 @@ function HomePage() {
         </div>
       </section>
 
+      {/* 모바일: 법적·안내 링크 (데스크톱은 아래 푸터와 동일 데이터) */}
+      <div className="md:hidden border-t border-gray-100 bg-gray-50/80 px-5 py-8">
+        <LegalFooterLinks className="flex flex-wrap items-center justify-center gap-x-2 gap-y-2 text-xs text-gray-400" />
+      </div>
+
       {/* ══════════════════════════════════
           [DESKTOP ONLY] 푸터
       ══════════════════════════════════ */}
       <footer className="hidden md:block bg-white border-t border-gray-100 py-12">
-        <div className="mx-auto max-w-6xl px-6 flex items-start justify-between">
+        <div className="mx-auto max-w-6xl px-6 flex flex-wrap items-start justify-between gap-10">
           <div className="max-w-xs">
-            <p className="text-cyan-500 font-semibold text-sm mb-2">The Editorial Architect</p>
-            <p className="text-xs text-gray-400 leading-relaxed">
-              세상에서 가장 정교한 편 코드로 이루어진 이 프로젝트 입니다.
+            <p className="text-cyan-600 font-semibold text-sm mb-2">여행 체크리스트</p>
+            <p className="text-xs text-gray-500 leading-relaxed">
+              항공·일정을 바탕으로 준비물과 방문 동선을 정리하고, 체크리스트로 출발 전까지 한눈에 확인할 수 있는 여행 준비
+              서비스입니다.
             </p>
-            <div className="flex items-center gap-4 mt-4">
-              <a href="#" className="text-xs text-gray-400 hover:text-gray-600 transition-colors">홈페이지</a>
-              <a href="#" className="text-xs text-gray-400 hover:text-gray-600 transition-colors">블로그</a>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-4">
+              <Link to="/" className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
+                홈
+              </Link>
+              <a href="#" className="text-xs text-gray-400 hover:text-gray-600 transition-colors">
+                공지·소식
+              </a>
             </div>
           </div>
 
           {FOOTER_SECTIONS.map((section) => (
             <div key={section.id}>
-              <p className="text-xs font-semibold text-gray-900 uppercase tracking-widest mb-4">
-                {section.title}
-              </p>
+              <p className="text-xs font-semibold text-gray-900 tracking-wide mb-4">{section.title}</p>
               <ul className="space-y-2">
                 {section.links.map((link) => (
                   <li key={link}>
@@ -428,8 +442,9 @@ function HomePage() {
         </div>
 
         <div className="mx-auto max-w-6xl px-6 mt-10 pt-6 border-t border-gray-50">
+          <LegalFooterLinks className="flex flex-wrap items-center justify-center gap-x-2 gap-y-2 text-xs text-gray-400 mb-5" />
           <p className="text-xs text-gray-400 text-center">
-            © 2024 The Editorial Architect · All rights reserved
+            © 2024 여행 체크리스트. 무단 복제 및 배포를 금합니다.
           </p>
         </div>
       </footer>

@@ -58,13 +58,13 @@ export const FEATURE_CARDS = [
 export const FOOTER_SECTIONS = [
   {
     id: 'platform',
-    title: 'Platform',
-    links: ['Pricing', 'Integrations', 'Enterprise'],
+    title: '서비스',
+    links: ['요금 안내', '연동·제휴', '기업·단체 문의'],
   },
   {
     id: 'company',
-    title: 'Company',
-    links: ['About', 'Design Ethics', 'Contact'],
+    title: '회사 소개',
+    links: ['서비스 소개', '운영 원칙', '문의하기'],
   },
 ]
 

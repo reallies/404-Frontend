@@ -34,15 +34,15 @@ function TripGuideArchiveInner({ tripId }) {
     >
       <div className="mx-auto max-w-3xl px-4 py-8 md:py-12">
         <Link
-          to={`/trips/${tripId}/search`}
+          to="/"
           className="text-sm text-teal-700 hover:text-teal-900 mb-4 inline-flex items-center gap-1 font-medium"
         >
-          ← 맞춤 준비 가이드로
+          홈으로
         </Link>
 
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-8">
           <div>
-            <h1 className="text-2xl md:text-3xl font-extrabold text-gray-900">여행 정보 가이드 보관함</h1>
+            <h1 className="text-2xl md:text-3xl font-extrabold text-gray-900">여행 정보 Ckeck리스트</h1>
             <p className="text-sm text-gray-600 mt-2 leading-relaxed">
               저장한 항목을 누르면 그 시점의 <strong className="text-gray-800">맞춤 여행 준비 가이드</strong> 전체를 다시 볼 수
               있습니다.
@@ -63,10 +63,10 @@ function TripGuideArchiveInner({ tripId }) {
           <div className="rounded-2xl border border-dashed border-gray-300 bg-white/80 px-6 py-16 text-center">
             <p className="text-gray-500 text-sm mb-4">아직 저장된 가이드가 없습니다.</p>
             <Link
-              to={`/trips/${tripId}/search`}
+              to="/trips/new/step2"
               className="inline-block rounded-xl bg-teal-700 hover:bg-teal-800 text-white text-sm font-bold px-6 py-3"
             >
-              준비 가이드 보러 가기
+              여행 정보 캐러 가기
             </Link>
           </div>
         ) : (

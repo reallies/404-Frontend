@@ -23,6 +23,11 @@ export const IMAGES = {
       'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?q=80&w=400&auto=format&fit=crop',
     product2:
       'https://images.unsplash.com/photo-1452780212940-6f5c0d14d848?q=80&w=400&auto=format&fit=crop',
+    /** 에디토리얼 섹션: 여행 준비·일정·체크 흐름 (홈 히어로와 톤 맞춤) */
+    editorial1:
+      'https://images.unsplash.com/photo-1488646953014-85cb44e25828?q=80&w=560&auto=format&fit=crop',
+    editorial2:
+      'https://images.unsplash.com/photo-1524661135-423995f22d0b?q=80&w=560&auto=format&fit=crop',
   },
 
   tripNew: {

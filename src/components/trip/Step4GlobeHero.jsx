@@ -1,5 +1,5 @@
-import { Suspense, useRef } from 'react'
-import { Canvas, useFrame } from '@react-three/fiber'
+import { Suspense, useLayoutEffect, useRef } from 'react'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Float, Sparkles, Stars } from '@react-three/drei'
 import * as THREE from 'three'
 
@@ -70,10 +70,20 @@ function LivingGlobe({ mouse }) {
   )
 }
 
+/** CSS 'transparent' 대신 WebGL 클리어 알파로 투명 배경 (THREE.Color 경고 방지) */
+function TransparentClear() {
+  const { scene, gl } = useThree()
+  useLayoutEffect(() => {
+    scene.background = null
+    gl.setClearColor(0x000000, 0)
+  }, [scene, gl])
+  return null
+}
+
 function SceneContent({ mouse }) {
   return (
     <>
-      <color attach="background" args={['transparent']} />
+      <TransparentClear />
       <hemisphereLight args={['#2a5a62', '#0a1218', 1.05]} />
       <directionalLight position={[6, 8, 10]} intensity={1.35} color="#cffff9" />
       <directionalLight position={[-8, -3, -6]} intensity={0.45} color="#006080" />
