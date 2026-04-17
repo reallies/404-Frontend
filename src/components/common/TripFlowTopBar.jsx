@@ -44,6 +44,8 @@ export function TripFlowMobileBar({
   backTo: _backTo,
   /** 홈 등 루트 화면: 뒤로 없이 좌측만 여백으로 맞춤(그리드 중앙 로고 유지) */
   showBack = true,
+  /** 있으면 중앙에 로고 대신 제목(예: 여행지 & 일정 설정) */
+  centerTitle,
   className = '',
   logoClassName = 'h-6 w-auto max-w-[min(190px,62vw)]',
 }) {
@@ -60,7 +62,13 @@ export function TripFlowMobileBar({
           )}
         </div>
         <div className="flex min-w-0 justify-center px-1">
-          <BrandLogo className={`${logoClassName} drop-shadow-sm`} />
+          {centerTitle != null && centerTitle !== '' ? (
+            <h1 className="max-w-[min(220px,58vw)] truncate text-center text-sm font-bold leading-tight text-slate-800">
+              {centerTitle}
+            </h1>
+          ) : (
+            <BrandLogo className={`${logoClassName} drop-shadow-sm`} />
+          )}
         </div>
         <div className="flex min-w-0 justify-end">
           <TripFlowMobileProfileButton onClick={() => navigate('/mypage')} />

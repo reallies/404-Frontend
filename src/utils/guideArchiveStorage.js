@@ -91,3 +91,21 @@ export function appendGuideArchiveEntry(tripId, snapshot) {
   }
   return next
 }
+
+/** 목록 전체를 덮어씁니다. (예시 시드 등 특수 용도) */
+export function saveGuideArchiveList(tripId, entries) {
+  if (tripId == null) return
+  try {
+    localStorage.setItem(STORAGE_PREFIX + String(tripId), JSON.stringify(entries))
+  } catch (e) {
+    console.warn('[guideArchiveStorage] saveGuideArchiveList failed', e)
+  }
+}
+
+/** 지정한 id의 스냅샷만 제거합니다. */
+export function removeGuideArchiveEntriesByIds(tripId, entryIds) {
+  if (tripId == null || !Array.isArray(entryIds) || entryIds.length === 0) return
+  const drop = new Set(entryIds.map((id) => String(id)))
+  const next = loadGuideArchive(tripId).filter((e) => !drop.has(String(e.id)))
+  saveGuideArchiveList(tripId, next)
+}

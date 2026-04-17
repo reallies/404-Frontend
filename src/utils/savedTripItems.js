@@ -80,3 +80,13 @@ export function mergeWithInitialChecklist(tripId, initialItems) {
 export function countSavedItems(tripId) {
   return loadSavedItems(tripId).length
 }
+
+/** 저장 목록 전체를 덮어씁니다. (예시 시드 등 특수 용도) */
+export function replaceSavedItemsList(tripId, list) {
+  if (tripId == null) return
+  try {
+    localStorage.setItem(STORAGE_PREFIX + String(tripId), JSON.stringify(list))
+  } catch (e) {
+    console.warn('[savedTripItems] replaceSavedItemsList failed', e)
+  }
+}

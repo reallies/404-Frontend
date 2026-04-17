@@ -140,7 +140,7 @@ function TripNewStep2Page() {
           />
 
           {/* 옵션 카드 */}
-          <div className="space-y-4 mb-6">
+          <div className="space-y-4">
             {OPTION_CARDS.map((card) => (
               <button
                 key={card.id}
@@ -170,6 +170,28 @@ function TripNewStep2Page() {
               </button>
             ))}
           </div>
+
+          {/* 아래 카드(아직 안 했어요) 직후 · 이 모바일 열은 md 이상에서 전체 숨김 */}
+          <aside
+            className="mt-2 overflow-hidden rounded-2xl shadow-lg ring-1 ring-slate-200/50"
+            aria-label="AI 컨시어지 안내 배너"
+          >
+            <div
+              className="relative min-h-[148px] bg-slate-800 bg-cover bg-center"
+              style={{
+                backgroundImage: `linear-gradient(105deg, rgba(15, 23, 42, 0.82) 0%, rgba(15, 23, 42, 0.5) 55%, rgba(15, 23, 42, 0.28) 100%), url(${AI_TIP.mobileImage})`,
+              }}
+            >
+              <div className="relative px-5 py-5">
+                <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.22em] text-white/95">
+                  {AI_TIP.mobileTitle}
+                </p>
+                <p className="text-sm font-medium leading-relaxed text-white [text-shadow:0_1px_2px_rgba(0,0,0,0.35)]">
+                  {AI_TIP.mobileDesc}
+                </p>
+              </div>
+            </div>
+          </aside>
         </div>
       </div>
     </div>

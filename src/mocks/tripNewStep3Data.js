@@ -53,17 +53,14 @@ export const FLIGHT_SECTIONS = [
   },
 ]
 
+/** Step3 부제(맞춤 여행 준비…) 바로 아래에 표시 — 편명 형식 안내 */
+export const FLIGHT_NO_EXAMPLES_HINT =
+  '입력 예: KE101, VN401, OZ851, TW702 — 항공권·예약 확인서에 적힌 편명과 동일하게 입력해 주세요.'
+
 /* ─────────────────────────────────────────────
    데스크탑 우측 이미지 (비행기 + 하늘)
 ───────────────────────────────────────────── */
 export const HERO_IMAGE = '/airplane-sky.png'
-
-/* ─────────────────────────────────────────────
-   모바일 하단 Flight Preview 이미지
-───────────────────────────────────────────── */
-export const PREVIEW_IMAGE =
-  'https://images.unsplash.com/photo-1556388158-158ea5ccacbd?q=80&w=600&auto=format&fit=crop'
-
 
 /* ─────────────────────────────────────────────
    AI 팁 (step2와 다른 내용, 제목: 꿀 Tip!)

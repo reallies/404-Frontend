@@ -24,6 +24,7 @@ import StepHeader from '@/components/common/StepHeader'
 import { TripFlowDesktopBar, TripFlowMobileBar } from '@/components/common/TripFlowTopBar'
 import AiConciergeTip, { AiConciergeTipHeading, AiConciergeTipIcon } from '@/components/common/AiConciergeTip'
 import TripStepDesktopSplit from '@/components/trip/TripStepDesktopSplit'
+import { TripFlowNextStepButton } from '@/components/trip/TripFlowNextStepButton'
 import { FullBleedMintGlobeHero } from '@/components/trip/MintProgressiveHero'
 
 const Step4GlobeHero = lazy(() => import('@/components/trip/Step4GlobeHero'))
@@ -896,18 +897,7 @@ function TripNewStep4PageContent({ arrival, mergedNavState }) {
             </div>
 
             <div className="mt-6">
-              <button
-                type="button"
-                onClick={handleNext}
-                disabled={!canProceed}
-                className={`flex w-full items-center justify-center gap-2 rounded-2xl px-6 py-4 text-base font-bold shadow-md transition-all ${
-                  canProceed
-                    ? 'cursor-pointer bg-amber-400 text-white hover:bg-amber-500 hover:shadow-lg'
-                    : 'cursor-not-allowed bg-gray-200 text-gray-400'
-                }`}
-              >
-                다음 단계로 →
-              </button>
+              <TripFlowNextStepButton variant="amber" disabled={!canProceed} onClick={handleNext} />
             </div>
           </>
         }
@@ -1009,20 +999,9 @@ function TripNewStep4PageContent({ arrival, mergedNavState }) {
           )}
         </div>
 
-        {/* 바텀 네비에 가리지 않도록 Step3와 동일: 탭 높이만큼 위에 고정 */}
-        <div className="fixed bottom-16 left-0 right-0 z-40 px-5 pb-3 pt-3 bg-gradient-to-t from-white via-white/95 to-transparent [padding-bottom:max(0.75rem,env(safe-area-inset-bottom))]">
-          <button
-            type="button"
-            onClick={handleNext}
-            disabled={!canProceed}
-            className={`w-full flex items-center justify-center gap-2 font-bold text-base py-4 rounded-2xl shadow-md transition-all ${
-              canProceed
-                ? 'bg-amber-400 hover:bg-amber-500 text-white cursor-pointer'
-                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-            }`}
-          >
-            다음 단계로 →
-          </button>
+        {/* 바텀 네비에 가리지 않도록 목적지·Step3와 동일: 탭 높이만큼 위에 고정 */}
+        <div className="fixed bottom-16 left-0 right-0 z-40 bg-transparent px-5 pb-3 pt-3 [padding-bottom:max(0.75rem,env(safe-area-inset-bottom))]">
+          <TripFlowNextStepButton variant="amber" disabled={!canProceed} onClick={handleNext} />
         </div>
       </div>
     </div>

@@ -4,18 +4,21 @@ import {
   STEP_DESTINATION_CONFIG,
   DESTINATION_ICON_PATHS,
   COUNTRY_ARRIVAL_OPTIONS,
+  MOBILE_QUICK_DESTINATION_CHIPS,
   filterCountriesByQuery,
   sanitizeCountryInput,
   HERO_IMAGE,
-  PREVIEW_IMAGE,
   AI_TIP,
-  MOBILE_TIP,
 } from '@/mocks/tripNewDestinationData'
 import StepHeader from '@/components/common/StepHeader'
-import AiConciergeTip, { AiConciergeTipHeading, AiConciergeTipIcon } from '@/components/common/AiConciergeTip'
+import AiConciergeTip from '@/components/common/AiConciergeTip'
 import TripStepDesktopSplit from '@/components/trip/TripStepDesktopSplit'
+import { TripFlowNextStepButton } from '@/components/trip/TripFlowNextStepButton'
 import { FullBleedMintImageHero } from '@/components/trip/MintProgressiveHero'
 import { TripFlowDesktopBar, TripFlowMobileBar } from '@/components/common/TripFlowTopBar'
+import DestinationMobileRangeCalendar, {
+  formatTripNightsDaysLabel,
+} from '@/components/trip/DestinationMobileRangeCalendar'
 import { saveStep4NavigationState } from '@/utils/tripFlowDraftStorage'
 
 /** `<input type="date" min>` 용 — 브라우저 로컬 달력과 맞추기 위해 UTC가 아닌 로컬 날짜 사용 */
@@ -49,17 +52,17 @@ function findExactCountryMatch(trimmedQuery) {
 
 const SUBTITLE_DESKTOP = (
   <p className="text-gray-600">
-    어디로, 언제 떠날지 알려주시면 Mate가 당신만을 위한 체크리스트를 제안해드릴게요!
+    어디로, 언제 떠날지 알려주시면 저희가 당신만을 위한 체크리스트를 만들어드릴게요!
   </p>
 )
 
-const SUBTITLE_MOBILE = (
-  <div className="space-y-2">
-    <p className="text-sm text-gray-600">
-      어디로, 언제 떠날지 알려주시면 Mate가 맞춤 체크리스트를 제안해드릴게요!
-    </p>
-  </div>
-)
+function formatKoreanDateRangeLine(startStr, endStr) {
+  if (!startStr || !endStr) return ''
+  const [y1, m1, d1] = startStr.split('-').map(Number)
+  const [y2, m2, d2] = endStr.split('-').map(Number)
+  if (y1 === y2) return `${m1}월 ${d1}일 - ${m2}월 ${d2}일`
+  return `${y1}년 ${m1}월 ${d1}일 - ${y2}년 ${m2}월 ${d2}일`
+}
 
 function DestinationDateForm({
   comboRef,
@@ -359,6 +362,11 @@ export default function TripNewDestinationPage() {
     setEndDate(next)
   }
 
+  const handleMobileRangeChange = ({ start, end }) => {
+    setStartDate(start)
+    setEndDate(end)
+  }
+
   const destinationSectionOk = Boolean(selectedCountry)
   const dateSectionOk =
     startDate !== '' && endDate !== '' && endDate >= startDate
@@ -401,12 +409,6 @@ export default function TripNewDestinationPage() {
     onEndChange: handleEndChange,
   }
 
-  const ctaClassName = `flex w-full items-center justify-center gap-2 rounded-2xl py-4 text-base font-bold shadow-sm transition-all ${
-    isValid
-      ? 'cursor-pointer bg-amber-400 text-gray-900 hover:bg-amber-500 hover:shadow-md'
-      : 'cursor-not-allowed bg-gray-200 text-gray-400'
-  }`
-
   return (
     <div
       className="min-h-screen"
@@ -437,12 +439,7 @@ export default function TripNewDestinationPage() {
             </div>
 
             <div className="mt-6">
-              <button type="button" disabled={!isValid} onClick={goNext} className={ctaClassName}>
-                다음 단계로 이동
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z" />
-                </svg>
-              </button>
+              <TripFlowNextStepButton variant="amber" disabled={!isValid} onClick={goNext} />
             </div>
           </>
         }
@@ -454,55 +451,176 @@ export default function TripNewDestinationPage() {
       />
 
       <div className="md:hidden">
-        <TripFlowMobileBar backTo="/trips/new/step2" />
+        <TripFlowMobileBar backTo="/trips/new/step2" centerTitle="여행지 & 일정 설정" />
 
-        <div className="px-5 pb-44 pt-4">
-          <StepHeader
-            currentStep={STEP_DESTINATION_CONFIG.currentStep}
-            totalSteps={STEP_DESTINATION_CONFIG.totalSteps}
-            title={
-              <>
-                방문 도시와 날짜를
-                <br />
-                알려주세요
-              </>
-            }
-            subtitle={SUBTITLE_MOBILE}
-            className="mb-6"
-            titleClassName="text-2xl"
-          />
-
-          <DestinationDateForm {...formProps} />
-
-          <div className="mb-5 mt-5 flex items-start gap-3 rounded-2xl bg-white p-4 shadow-sm">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-100 p-0.5">
-              <AiConciergeTipIcon className="h-6 w-6" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="mb-1.5">
-                <AiConciergeTipHeading variant="onLight" />
-              </p>
-              <p className="text-sm leading-relaxed text-gray-600">{MOBILE_TIP}</p>
+        <div className="px-4 pb-44 pt-4">
+          <div className="mb-6 flex items-center gap-3">
+            <span className="shrink-0 rounded-full bg-teal-800 px-3 py-1.5 text-[11px] font-bold tracking-wide text-white">
+              STEP {String(STEP_DESTINATION_CONFIG.currentStep).padStart(2, '0')}
+            </span>
+            <div className="h-2 flex-1 overflow-hidden rounded-full bg-sky-100">
+              <div
+                className="h-full rounded-full bg-teal-500 transition-all duration-500"
+                style={{
+                  width: `${Math.round(
+                    (STEP_DESTINATION_CONFIG.currentStep / STEP_DESTINATION_CONFIG.totalSteps) * 100,
+                  )}%`,
+                }}
+              />
             </div>
           </div>
 
-          <div className="relative mb-4 h-44 overflow-hidden rounded-2xl">
-            <img src={PREVIEW_IMAGE} alt="여행 미리보기" className="h-full w-full object-cover" loading="lazy" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-            <div className="absolute bottom-4 left-5">
-              <p className="mb-0.5 text-[10px] font-bold uppercase tracking-widest text-white/70">TRIP PREVIEW</p>
-              <p className="text-xs text-white/90">Your journey starts with a destination.</p>
+          <h2 className="mb-3 text-lg font-bold text-gray-900">방문 도시 검색</h2>
+          <div className="mb-8 rounded-2xl border border-sky-100/90 bg-sky-50/95 p-4 shadow-sm">
+            <div ref={comboRef} className="relative z-20">
+              <div
+                className={`relative border border-sky-100/80 bg-white shadow-inner transition-[border-radius,box-shadow] ${
+                  dropdownOpen && countryQuery.trim().length > 0
+                    ? 'rounded-t-2xl ring-2 ring-sky-200'
+                    : 'rounded-2xl'
+                }`}
+              >
+                <SvgIcon
+                  name="search"
+                  className="pointer-events-none absolute left-4 top-1/2 z-10 h-5 w-5 -translate-y-1/2 text-gray-400"
+                />
+                <input
+                  type="text"
+                  value={countryQuery}
+                  onChange={(e) => handleCountryInputChange(e.target.value)}
+                  onKeyDown={handleCountryKeyDown}
+                  onFocus={handleCountryFocus}
+                  placeholder="어디로 떠나시나요?"
+                  autoComplete="off"
+                  aria-autocomplete="list"
+                  aria-expanded={dropdownOpen && countryQuery.trim().length > 0}
+                  aria-controls="country-autocomplete-panel-mobile"
+                  className={`w-full rounded-2xl bg-transparent py-3.5 pl-12 pr-4 text-sm text-gray-800 outline-none placeholder:text-gray-400 ${
+                    dropdownOpen && countryQuery.trim().length > 0 ? 'rounded-t-2xl' : ''
+                  }`}
+                />
+              </div>
+
+              {dropdownOpen && countryQuery.trim().length > 0 && (
+                <div
+                  id="country-autocomplete-panel-mobile"
+                  role="listbox"
+                  aria-label="국가 자동완성"
+                  className="absolute left-0 right-0 top-full z-30 max-h-52 overflow-y-auto rounded-b-2xl border border-t-0 border-sky-200 bg-white shadow-lg ring-2 ring-sky-200 ring-t-0"
+                >
+                  {suggestions.length === 0 ? (
+                    <p className="px-4 py-3 text-sm text-gray-500">
+                      일치하는 국가가 없어요. 다른 검색어를 입력해 보세요.
+                    </p>
+                  ) : (
+                    <ul className="py-1">
+                      {suggestions.map((c) => (
+                        <li key={c.name} role="none">
+                          <button
+                            type="button"
+                            role="option"
+                            onMouseDown={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              confirmCountry(c)
+                            }}
+                            className="flex w-full items-center gap-2 px-4 py-2.5 text-left text-sm text-gray-800 transition hover:bg-sky-50"
+                          >
+                            <span className="font-semibold">{c.name}</span>
+                            <span className="text-xs text-gray-500">
+                              {c.city} · {c.iata}
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
             </div>
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              {MOBILE_QUICK_DESTINATION_CHIPS.map((chip) => (
+                <button
+                  key={chip.label}
+                  type="button"
+                  onClick={() => {
+                    const c = COUNTRY_ARRIVAL_OPTIONS.find((x) => x.name === chip.countryName)
+                    if (c) confirmCountry(c)
+                  }}
+                  className="rounded-full border border-sky-200/90 bg-white px-3 py-1.5 text-xs font-semibold text-sky-800 shadow-sm transition active:scale-[0.98]"
+                >
+                  #{chip.label}
+                </button>
+              ))}
+            </div>
+
+            {selectedCountry && (
+              <div className="mt-3 border-t border-sky-100/80 pt-3">
+                <p className="mb-2 text-[11px] font-medium text-gray-500">선택한 여행지</p>
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-teal-200 bg-teal-50 px-3 py-1.5 text-sm font-semibold text-teal-900 shadow-sm">
+                  <span className="text-teal-600">#</span>
+                  {selectedCountry.name}
+                  <span className="text-xs font-normal text-teal-700/80">({selectedCountry.city})</span>
+                  <button
+                    type="button"
+                    onClick={removeCountryTag}
+                    className="ml-0.5 flex h-5 w-5 items-center justify-center rounded-full text-teal-600 hover:bg-teal-200/60"
+                    aria-label={`${selectedCountry.name} 선택 해제`}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                    </svg>
+                  </button>
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div className="mb-3 flex items-baseline justify-between gap-2">
+            <h2 className={`text-lg font-bold ${selectedCountry ? 'text-gray-900' : 'text-gray-400'}`}>
+              여행 기간 선택
+            </h2>
+            <span className="text-sm font-semibold text-gray-500">
+              {(startDate ? parseInt(startDate.slice(0, 4), 10) : new Date().getFullYear())}년
+            </span>
+          </div>
+
+          <div className="relative rounded-2xl border border-sky-100/90 bg-sky-50/95 p-3 shadow-sm">
+            {!selectedCountry && (
+              <p className="mb-2 rounded-xl bg-white/90 px-3 py-2 text-xs leading-relaxed text-gray-600 ring-1 ring-sky-100/80">
+                위에서 <strong className="text-sky-700">여행지</strong>를 먼저 선택하면 일정을 고를 수 있어요.
+              </p>
+            )}
+            <DestinationMobileRangeCalendar
+              startDate={startDate}
+              endDate={endDate}
+              todayYmd={today}
+              minDateYmd={today}
+              disabled={!selectedCountry}
+              onChangeRange={handleMobileRangeChange}
+            />
+            {selectedCountry && startDate && endDate && (
+              <div className="pointer-events-none absolute bottom-3 left-1/2 z-10 flex max-w-[calc(100%-1rem)] -translate-x-1/2 items-center gap-2 rounded-full border border-sky-200/90 bg-white px-3 py-2 text-[11px] font-semibold text-gray-800 shadow-lg sm:text-xs">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="h-4 w-4 shrink-0 text-amber-400"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  aria-hidden
+                >
+                  <path d="M12 2L9.19 8.63 2 9.24l5.46 4.73L5.82 21 12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2z" />
+                </svg>
+                <span className="truncate">
+                  {formatKoreanDateRangeLine(startDate, endDate)} ({formatTripNightsDaysLabel(startDate, endDate)})
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
         <div className="fixed bottom-16 left-0 right-0 z-40 bg-transparent px-5 pb-3 pt-3 [padding-bottom:max(0.75rem,env(safe-area-inset-bottom))]">
-          <button type="button" disabled={!isValid} onClick={goNext} className={ctaClassName}>
-            다음 단계로 이동
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z" />
-            </svg>
-          </button>
+          <TripFlowNextStepButton variant="amber" disabled={!isValid} onClick={goNext} />
         </div>
       </div>
     </div>

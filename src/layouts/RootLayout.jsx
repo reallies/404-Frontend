@@ -58,7 +58,6 @@ function RootLayout() {
   const hideHeaderOnMobile = shouldHideGlobalHeaderOnMobile(pathname)
   const padMainMobile = shouldPadMainForMobileBottomNav(pathname)
   const showAiPlannerFab = shouldShowAiPlannerFab(pathname)
-  const searchFabMobileBottom = /^\/trips\/[^/]+\/search$/.test(pathname)
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
@@ -93,11 +92,7 @@ function RootLayout() {
         })}
       </nav>
 
-      {showAiPlannerFab ? (
-        <AiPlannerFab
-          {...(searchFabMobileBottom ? { mobileBottomClassName: 'bottom-[10.25rem]' } : {})}
-        />
-      ) : null}
+      {showAiPlannerFab ? <AiPlannerFab /> : null}
     </div>
   )
 }

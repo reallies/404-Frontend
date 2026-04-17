@@ -11,6 +11,7 @@ import {
 } from '@/mocks/tripNewStep5Data'
 import StepHeader from '@/components/common/StepHeader'
 import { TripFlowDesktopBar, TripFlowMobileBar } from '@/components/common/TripFlowTopBar'
+import { TripFlowNextStepButton } from '@/components/trip/TripFlowNextStepButton'
 
 function SvgIcon({ name, className = 'w-6 h-6' }) {
   const d = STEP5_ICON_PATHS[name]
@@ -170,21 +171,14 @@ export default function TripNewStep5Page() {
             </div>
 
             <div className="flex justify-end mt-10 pt-4 border-t border-slate-200/70">
-              <button
-                type="button"
-                onClick={handleCreatePlan}
+              <TripFlowNextStepButton
+                variant="teal"
+                fullWidth={false}
                 disabled={!canSubmit}
-                className={`inline-flex items-center gap-2 font-bold text-base py-4 px-10 rounded-2xl shadow-md transition-all ${
-                  canSubmit
-                    ? 'bg-teal-700 hover:bg-teal-800 text-white hover:shadow-lg cursor-pointer'
-                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                }`}
+                onClick={handleCreatePlan}
               >
                 여행 계획 생성하기
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z" />
-                </svg>
-              </button>
+              </TripFlowNextStepButton>
             </div>
           </div>
         </div>
@@ -244,19 +238,15 @@ export default function TripNewStep5Page() {
           </div>
         </div>
 
-        <div className="fixed bottom-16 left-0 right-0 z-40 px-5 pb-3 pt-3 bg-gradient-to-t from-white via-white/95 to-transparent [padding-bottom:max(0.75rem,env(safe-area-inset-bottom))]">
-          <button
-            type="button"
-            onClick={handleCreatePlan}
+        <div className="fixed bottom-16 left-0 right-0 z-40 bg-transparent px-5 pb-3 pt-3 [padding-bottom:max(0.75rem,env(safe-area-inset-bottom))]">
+          <TripFlowNextStepButton
+            variant="teal"
             disabled={!canSubmit}
-            className={`w-full flex items-center justify-center gap-2 font-bold text-base py-4 rounded-2xl shadow-md transition-all ${
-              canSubmit
-                ? 'bg-teal-700 hover:bg-teal-800 text-white cursor-pointer'
-                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-            }`}
+            onClick={handleCreatePlan}
+            showTrailingIcon={false}
           >
             여행 계획 생성하기
-          </button>
+          </TripFlowNextStepButton>
         </div>
       </div>
     </div>

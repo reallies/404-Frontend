@@ -26,6 +26,15 @@ export const DESTINATION_ICON_PATHS = {
  * name: 표시·검색 기준 국가명
  * aliases: 보조 검색어 (예: '한국' → 대한민국)
  */
+/** 모바일 빠른 선택 칩 — 표시 라벨 → `COUNTRY_ARRIVAL_OPTIONS`의 `name`과 매칭 */
+export const MOBILE_QUICK_DESTINATION_CHIPS = [
+  { label: '파리', countryName: '프랑스' },
+  { label: '도쿄', countryName: '일본' },
+  { label: '방콕', countryName: '태국' },
+  { label: '뉴욕', countryName: '미국' },
+  { label: '제주도', countryName: '대한민국' },
+]
+
 export const COUNTRY_ARRIVAL_OPTIONS = [
   { name: '대한민국', aliases: ['한국', '코리아'], iata: 'ICN', city: '인천', country: '대한민국', countryCode: 'KR' },
   { name: '일본', aliases: ['재팬'], iata: 'NRT', city: '도쿄', country: '일본', countryCode: 'JP' },

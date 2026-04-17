@@ -67,9 +67,10 @@ export const OPTION_CARDS = [
 export const AI_TIP = {
   description:
     '항공권을 아직 예매하지 않으셨다면, <strong>화요일 오후 3시</strong>에 검색해 보세요! 통계적으로 가장 저렴한 티켓을 찾을 확률이 높습니다.',
-  mobileTitle: 'AI CONCIERGE TIPS',
+  /** 모바일 step2 하단 배너 (체크리스트 안내 + 자연 풍경 이미지) */
+  mobileTitle: 'TRAVEL CHECKLIST',
   mobileDesc:
-    '항공편을 등록하면 공항 도착 시간에 맞는 최적의 경로를 추천합니다.',
+    '목적지와 일정에 맞춰 필요한 준비물을 체크리스트로 정리하고, 출발 전까지 빠짐없이 확인해 보세요.',
   mobileImage:
-    'https://images.unsplash.com/photo-1436491865332-7a61a109db05?q=80&w=600&auto=format&fit=crop',
+    'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=900&q=85&auto=format&fit=crop',
 }
