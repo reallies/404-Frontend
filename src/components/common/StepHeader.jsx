@@ -6,7 +6,9 @@
  *   totalSteps   {number}  전체 스텝 수    (예: 4)
  *   title        {string|ReactNode}  제목 텍스트 (줄바꿈 포함 가능)
  *   subtitle     {string|ReactNode}  (optional) 제목 아래 소개 문구
- *   className    {string}  (optional) 외부 여백 등 추가 클래스
+ *   className      {string}  (optional) 외부 여백 등 추가 클래스
+ *   titleClassName   {string}  (optional) 제목(h1) 타이포 — 예: 모바일만 `text-2xl`
+ *   subtitleClassName {string} (optional) 부제 영역 타이포 — 기본 `text-base`
  */
 export default function StepHeader({
   currentStep,
@@ -14,6 +16,8 @@ export default function StepHeader({
   title,
   subtitle,
   className = '',
+  titleClassName,
+  subtitleClassName,
 }) {
   const progressPct = Math.round((currentStep / totalSteps) * 100)
 
@@ -26,8 +30,10 @@ export default function StepHeader({
         </span>
       </p>
 
-      {/* 제목 — 데스크탑·모바일 동일 크기 */}
-      <h1 className="text-4xl font-extrabold text-gray-900 leading-[1.2] mb-4">
+      {/* 제목 — 기본 text-4xl, titleClassName으로 페이지별 조정 가능 */}
+      <h1
+        className={`font-extrabold text-gray-900 leading-[1.2] mb-4 ${titleClassName ?? 'text-4xl'}`}
+      >
         {title}
       </h1>
 
@@ -46,7 +52,11 @@ export default function StepHeader({
 
       {/* 부제목 (optional) — 문자열·복수 문단·목록 등 ReactNode 허용 */}
       {subtitle && (
-        <div className="text-gray-500 text-base leading-relaxed space-y-2.5 [&_strong]:font-semibold [&_ul]:text-sm [&_ul]:text-gray-500">
+        <div
+          className={`text-gray-500 leading-relaxed space-y-2.5 [&_strong]:font-semibold [&_ul]:text-sm [&_ul]:text-gray-500 ${
+            subtitleClassName ?? 'text-base'
+          }`}
+        >
           {subtitle}
         </div>
       )}

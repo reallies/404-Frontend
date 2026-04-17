@@ -12,9 +12,6 @@ export const HERO_IMAGE = '/airplane-sky.png'
 export const PREVIEW_IMAGE =
   'https://images.unsplash.com/photo-1488646953014-85cb44e25828?q=80&w=600&auto=format&fit=crop'
 
-export const MATE_AVATAR_URL =
-  'https://images.unsplash.com/photo-1587300003388-59208cc962cb?q=80&w=96&h=96&auto=format&fit=crop'
-
 export const DESTINATION_ICON_PATHS = {
   mapPin:
     'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z',

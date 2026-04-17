@@ -59,7 +59,13 @@ function TripNewStep2Page() {
           <StepHeader
             currentStep={STEP2_CONFIG.currentStep}
             totalSteps={STEP2_CONFIG.totalSteps}
-            title={<>항공권 예매를 하셨나요?</>}
+            title={
+              <>
+                항공편 예약을
+                <br />
+                하셨나요?
+              </>
+            }
             className="mb-10"
           />
 
@@ -122,8 +128,15 @@ function TripNewStep2Page() {
           <StepHeader
             currentStep={STEP2_CONFIG.currentStep}
             totalSteps={STEP2_CONFIG.totalSteps}
-            title={<>항공편 예약을<br />하셨나요?</>}
+            title={
+              <>
+                항공편 예약을
+                <br />
+                하셨나요?
+              </>
+            }
             className="mb-4"
+            titleClassName="text-2xl"
           />
 
           {/* 옵션 카드 */}

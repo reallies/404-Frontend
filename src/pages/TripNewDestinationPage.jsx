@@ -8,7 +8,6 @@ import {
   sanitizeCountryInput,
   HERO_IMAGE,
   PREVIEW_IMAGE,
-  MATE_AVATAR_URL,
   AI_TIP,
   MOBILE_TIP,
 } from '@/mocks/tripNewDestinationData'
@@ -49,33 +48,15 @@ function findExactCountryMatch(trimmedQuery) {
 }
 
 const SUBTITLE_DESKTOP = (
-  <p className="flex flex-wrap items-center gap-2 text-gray-600">
-    <span>
-      어디로, 언제 떠날지 알려주시면 Mate가 당신만을 위한 체크리스트를 제안해드릴게요!
-    </span>
-    <img
-      src={MATE_AVATAR_URL}
-      alt=""
-      className="h-9 w-9 shrink-0 rounded-full object-cover ring-2 ring-cyan-100 shadow-sm"
-      width={36}
-      height={36}
-      loading="lazy"
-    />
+  <p className="text-gray-600">
+    어디로, 언제 떠날지 알려주시면 Mate가 당신만을 위한 체크리스트를 제안해드릴게요!
   </p>
 )
 
 const SUBTITLE_MOBILE = (
   <div className="space-y-2">
-    <p className="flex flex-wrap items-center gap-2 text-sm text-gray-600">
-      <span>어디로, 언제 떠날지 알려주시면 Mate가 맞춤 체크리스트를 제안해드릴게요!</span>
-      <img
-        src={MATE_AVATAR_URL}
-        alt=""
-        className="h-8 w-8 shrink-0 rounded-full object-cover ring-2 ring-cyan-100"
-        width={32}
-        height={32}
-        loading="lazy"
-      />
+    <p className="text-sm text-gray-600">
+      어디로, 언제 떠날지 알려주시면 Mate가 맞춤 체크리스트를 제안해드릴게요!
     </p>
   </div>
 )
@@ -225,22 +206,13 @@ function DestinationDateForm({
           <div>
             <p className="mb-1.5 text-xs font-semibold text-gray-500">출발일</p>
             <div className="relative">
-              <img
-                src={MATE_AVATAR_URL}
-                alt=""
-                className={`pointer-events-none absolute left-2 top-1/2 z-10 h-9 w-9 -translate-y-1/2 rounded-full border-2 border-white object-cover shadow-md ${
-                  selectedCountry ? '' : 'opacity-60 grayscale'
-                }`}
-                width={36}
-                height={36}
-              />
               <input
                 type="date"
                 value={startDate}
                 min={today}
                 disabled={!selectedCountry}
                 onChange={(e) => onStartChange(e.target.value)}
-                className="w-full rounded-xl border border-sky-100/80 bg-sky-100/50 py-3 pl-14 pr-3 text-sm text-gray-800 outline-none focus:ring-2 focus:ring-sky-200 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
+                className="w-full rounded-xl border border-sky-100/80 bg-sky-100/50 px-3 py-3 text-sm text-gray-800 outline-none focus:ring-2 focus:ring-sky-200 disabled:cursor-not-allowed disabled:bg-gray-100 disabled:text-gray-400"
               />
             </div>
           </div>
@@ -497,6 +469,7 @@ export default function TripNewDestinationPage() {
             }
             subtitle={SUBTITLE_MOBILE}
             className="mb-6"
+            titleClassName="text-2xl"
           />
 
           <DestinationDateForm {...formProps} />
@@ -523,7 +496,7 @@ export default function TripNewDestinationPage() {
           </div>
         </div>
 
-        <div className="fixed bottom-16 left-0 right-0 z-40 bg-gradient-to-t from-white via-white/95 to-transparent px-5 pb-3 pt-3 [padding-bottom:max(0.75rem,env(safe-area-inset-bottom))]">
+        <div className="fixed bottom-16 left-0 right-0 z-40 bg-transparent px-5 pb-3 pt-3 [padding-bottom:max(0.75rem,env(safe-area-inset-bottom))]">
           <button type="button" disabled={!isValid} onClick={goNext} className={ctaClassName}>
             다음 단계로 이동
             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">

@@ -102,6 +102,7 @@ export default function TripNewStep5Page() {
             title={STEP5_PAGE_TITLE}
             subtitle={STEP5_PAGE_SUBTITLE}
             className="mb-2"
+            subtitleClassName="text-sm"
           />
         </div>
 
@@ -200,6 +201,8 @@ export default function TripNewStep5Page() {
             title={<>누구와 함께<br />하고 싶으세요?</>}
             subtitle={STEP5_PAGE_SUBTITLE}
             className="mb-6"
+            titleClassName="text-2xl"
+            subtitleClassName="text-sm"
           />
 
           <SectionLabel num={1} label="동행인 선택" />

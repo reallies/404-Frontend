@@ -1,7 +1,7 @@
 import { Outlet, Link, useLocation } from 'react-router-dom'
 import Header from '@/components/common/Header'
 import AiPlannerFab from '@/components/common/AiPlannerFab'
-import { shouldHideGlobalHeaderOnMobile } from '@/utils/tripLayoutPaths'
+import { shouldHideGlobalHeaderOnMobile, shouldPadMainForMobileBottomNav } from '@/utils/tripLayoutPaths'
 
 /** 홈·준비 항목 탐색(/trips/:id/search)에서만 메이퀸 FAB 표시. /trips/new/*(destination 포함)에서는 비표시 */
 function shouldShowAiPlannerFab(pathname) {
@@ -56,6 +56,7 @@ function RootLayout() {
   const location = useLocation()
   const { pathname } = location
   const hideHeaderOnMobile = shouldHideGlobalHeaderOnMobile(pathname)
+  const padMainMobile = shouldPadMainForMobileBottomNav(pathname)
   const showAiPlannerFab = shouldShowAiPlannerFab(pathname)
   const searchFabMobileBottom = /^\/trips\/[^/]+\/search$/.test(pathname)
 
@@ -66,7 +67,9 @@ function RootLayout() {
       </div>
 
       {/* flex-col + min-h-0: 자식 페이지가 flex-1로 뷰 높이까지 배경·레이아웃 채우기 가능 */}
-      <main className="flex min-h-0 flex-1 flex-col pb-16 md:pb-0">
+      <main
+        className={`flex min-h-0 flex-1 flex-col md:pb-0 ${padMainMobile ? 'pb-16' : ''}`}
+      >
         <Outlet />
       </main>
 

@@ -155,7 +155,7 @@ function Step4NonVnSelectedPlacesList({ items, onRemove, onReorder, countryLine 
                 onReorder(from, index)
               }}
             >
-              <div className="flex h-[76px] w-[52px] flex-shrink-0 items-center justify-center rounded-2xl bg-sky-300/90 text-xl font-extrabold text-white shadow-sm">
+              <div className="hidden h-[76px] w-[52px] flex-shrink-0 items-center justify-center rounded-2xl bg-sky-300/90 text-xl font-extrabold text-white shadow-sm md:flex">
                 {index + 1}
               </div>
               <div className="flex min-h-[64px] min-w-0 flex-1 items-center gap-3 rounded-[1.25rem] border border-slate-100 bg-white px-4 py-3 shadow-[0_8px_24px_-12px_rgba(15,23,42,0.12)]">
@@ -445,7 +445,7 @@ function VietnamNeighborhoodPicker({
                     onReorderStopOrder(from, index)
                   }}
                 >
-                  <div className="flex h-[76px] w-[52px] flex-shrink-0 items-center justify-center rounded-2xl bg-sky-300/90 text-xl font-extrabold text-white shadow-sm">
+                  <div className="hidden h-[76px] w-[52px] flex-shrink-0 items-center justify-center rounded-2xl bg-sky-300/90 text-xl font-extrabold text-white shadow-sm md:flex">
                     {index + 1}
                   </div>
                   <div className="flex min-h-[64px] min-w-0 flex-1 items-center gap-3 rounded-[1.25rem] border border-slate-100 bg-white px-4 py-3 shadow-[0_8px_24px_-12px_rgba(15,23,42,0.12)]">
@@ -841,6 +841,7 @@ function TripNewStep4PageContent({ arrival, mergedNavState }) {
               title="추가로 방문하는 지역이 있나요?"
               subtitle={step4HeaderSubtitle}
               className="mb-6"
+              subtitleClassName="text-sm"
             />
 
             <div className="min-h-0 flex-1 space-y-5 overflow-y-auto pr-1">
@@ -927,6 +928,8 @@ function TripNewStep4PageContent({ arrival, mergedNavState }) {
             title={<>추가로 방문하는<br />지역이 있나요?</>}
             subtitle={step4HeaderSubtitle}
             className="mb-5"
+            titleClassName="text-2xl"
+            subtitleClassName="text-sm"
           />
 
           <div className="space-y-4 mb-5">

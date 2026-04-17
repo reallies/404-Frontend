@@ -348,6 +348,7 @@ function TripNewStep3Page() {
               }
               subtitle={STEP3_SUBTITLE_DESKTOP}
               className="mb-8"
+              subtitleClassName="text-sm"
             />
 
             <div className="flex-1 space-y-4">
@@ -403,6 +404,8 @@ function TripNewStep3Page() {
             title={<>예약한 항공편 정보를<br />입력하세요</>}
             subtitle={STEP3_SUBTITLE_MOBILE}
             className="mb-6"
+            titleClassName="text-2xl"
+            subtitleClassName="text-sm"
           />
 
           {/* 항공편 입력 카드 목록 */}
@@ -443,8 +446,8 @@ function TripNewStep3Page() {
           </div>
         </div>
 
-        {/* 모바일 하단 고정 CTA — 바텀 네비(z-50)에 가리지 않도록 탭 높이만큼 위에 배치 */}
-        <div className="fixed bottom-16 left-0 right-0 z-40 px-5 pb-3 pt-3 bg-gradient-to-t from-white via-white/95 to-transparent [padding-bottom:max(0.75rem,env(safe-area-inset-bottom))]">
+        {/* 모바일 하단 고정 CTA — 바텀 네비 위에만 띄움. 흰색 그라데이션 없음(스크롤 영역과 색 이음) */}
+        <div className="fixed bottom-16 left-0 right-0 z-40 bg-transparent px-5 pb-3 pt-3 [padding-bottom:max(0.75rem,env(safe-area-inset-bottom))]">
           <button
             type="button"
             disabled={!isValid}
