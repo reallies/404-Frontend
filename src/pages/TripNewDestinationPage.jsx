@@ -16,7 +16,6 @@ import TripStepDesktopSplit from '@/components/trip/TripStepDesktopSplit'
 import { TripFlowNextStepButton } from '@/components/trip/TripFlowNextStepButton'
 import { FullBleedMintImageHero } from '@/components/trip/MintProgressiveHero'
 import { TripFlowDesktopBar, TripFlowMobileBar } from '@/components/common/TripFlowTopBar'
-import StepProgressBarMascot from '@/components/common/StepProgressBarMascot'
 import DestinationMobileRangeCalendar from '@/components/trip/DestinationMobileRangeCalendar'
 import { formatKoreanDateRangeLine, formatTripNightsDaysLabel } from '@/utils/tripDateFormat'
 import { saveStep4NavigationState } from '@/utils/tripFlowDraftStorage'
@@ -56,6 +55,18 @@ const SUBTITLE_DESKTOP = (
     어디로, 언제 떠날지 알려주시면 저희가 당신만을 위한 체크리스트를 만들어드릴게요!
   </p>
 )
+
+/** TripNewStep2Page와 동일한 페이지 배경 — 플로우 화면 통일 */
+const TRIP_FLOW_PAGE_BG_STYLE = {
+  background: `
+    radial-gradient(ellipse 110% 75% at 50% -8%, rgba(165, 243, 252, 0.35), transparent 58%),
+    radial-gradient(ellipse 85% 60% at 100% 12%, rgba(204, 251, 241, 0.45), transparent 52%),
+    radial-gradient(ellipse 80% 55% at 100% 92%, rgba(167, 243, 208, 0.22), transparent 55%),
+    radial-gradient(ellipse 70% 50% at 0% 45%, rgba(236, 253, 245, 0.9), transparent 52%),
+    radial-gradient(ellipse 95% 65% at 50% 105%, rgba(207, 250, 254, 0.35), transparent 55%),
+    linear-gradient(152deg, #f0fdfa 0%, #ecfeff 18%, #f0fdfa 42%, #eefcf6 68%, #f7fef9 100%)
+  `,
+}
 
 function DestinationDateForm({
   comboRef,
@@ -378,15 +389,12 @@ export default function TripNewDestinationPage() {
   }
 
   return (
-    <div
-      className="min-h-screen"
-      style={{ background: 'linear-gradient(180deg, #E0F7FA 0%, #F0FDFA 100%)' }}
-    >
+    <div className="min-h-screen" style={TRIP_FLOW_PAGE_BG_STYLE}>
       <TripStepDesktopSplit
         fullBleed={<FullBleedMintImageHero src={HERO_IMAGE} alt="비행기 창문" />}
         left={
           <>
-            <TripFlowDesktopBar backTo="/trips/new/step2" className="mb-6" />
+            <TripFlowDesktopBar backTo="/trips/new/step2" className="mb-4" />
 
             <StepHeader
               currentStep={STEP_DESTINATION_CONFIG.currentStep}
@@ -399,7 +407,7 @@ export default function TripNewDestinationPage() {
                 </>
               }
               subtitle={SUBTITLE_DESKTOP}
-              className="mb-8"
+              className="mb-10"
             />
 
             <div className="flex-1">
@@ -419,24 +427,23 @@ export default function TripNewDestinationPage() {
       />
 
       <div className="md:hidden">
-        <TripFlowMobileBar backTo="/trips/new/step2" centerTitle="여행지 & 일정 설정" />
+        <TripFlowMobileBar backTo="/trips/new/step2" />
 
-        <div className="px-4 pb-56 pt-4">
-          <div className="mb-6 flex items-center gap-3">
-            <span className="shrink-0 rounded-full bg-teal-800 px-3 py-1.5 text-[11px] font-bold tracking-wide text-white">
-              STEP {String(STEP_DESTINATION_CONFIG.currentStep).padStart(2, '0')}
-            </span>
-            <StepProgressBarMascot
-              percent={Math.round(
-                (STEP_DESTINATION_CONFIG.currentStep / STEP_DESTINATION_CONFIG.totalSteps) * 100,
-              )}
-              trackClassName="bg-sky-100"
-              fillClassName="bg-teal-500"
-              barHeightClass="h-2"
-            />
-          </div>
+        <div className="px-5 pt-4 pb-56">
+          <StepHeader
+            currentStep={STEP_DESTINATION_CONFIG.currentStep}
+            totalSteps={STEP_DESTINATION_CONFIG.totalSteps}
+            title={
+              <>
+                방문 도시와 날짜를
+                <br />
+                알려주세요
+              </>
+            }
+            className="mb-4"
+            titleClassName="text-2xl"
+          />
 
-          <h2 className="mb-3 text-lg font-bold text-gray-900">방문 도시 검색</h2>
           <div className="mb-8 rounded-2xl border border-sky-100/90 bg-sky-50/95 p-4 shadow-sm">
             <div ref={comboRef} className="relative z-20">
               <div

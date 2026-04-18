@@ -46,13 +46,13 @@ export const COMPANIONS = [
   {
     id: 'couple',
     label: '연인과',
-    description: '둘이서 떠나는 여행',
+    description: '로맨틱한 둘만의 여행',
     icon: 'heart',
   },
   {
     id: 'withKids',
     label: '아이와',
-    description: '아이 눈높이에 맞춘 일정',
+    description: '즐거운..? 육아 여행',
     icon: 'child',
   },
   {
@@ -64,24 +64,24 @@ export const COMPANIONS = [
   {
     id: 'parents',
     label: '부모님과',
-    description: '편안하고 든든한 동행',
+    description: '사랑하는 부모님과 함께',
     icon: 'home',
   },
 ]
 
 /* ─────────────────────────────────────────────
-   여행 스타일 (복수 선택) — 이모지로 모바일 카드 가독성 확보
+   여행 스타일 (복수 선택) — public/travel-style-icons/*.png
 ───────────────────────────────────────────── */
 export const TRAVEL_STYLES = [
-  { id: 'foodie', label: '먹방', emoji: '🍽️' },
-  { id: 'landmark', label: '랜드마크', emoji: '🏰' },
-  { id: 'healing', label: '힐링', emoji: '🌿' },
-  { id: 'shopping', label: '쇼핑', emoji: '🛍️' },
-  { id: 'nature', label: '자연', emoji: '🌳' },
-  { id: 'activity', label: '액티비티', emoji: '🏃' },
-  { id: 'culture', label: '문화예술', emoji: '🎨' },
-  { id: 'photo', label: '인생샷', emoji: '📷' },
-  { id: 'nightlife', label: '나이트라이프', emoji: '🍸' },
+  { id: 'foodie', label: '먹방', iconSrc: '/travel-style-icons/foodie.png' },
+  { id: 'landmark', label: '랜드마크', iconSrc: '/travel-style-icons/landmark.png' },
+  { id: 'healing', label: '힐링', iconSrc: '/travel-style-icons/healing.png' },
+  { id: 'shopping', label: '쇼핑', iconSrc: '/travel-style-icons/shopping.png' },
+  { id: 'nature', label: '자연', iconSrc: '/travel-style-icons/nature.png' },
+  { id: 'activity', label: '액티비티', iconSrc: '/travel-style-icons/activity.png' },
+  { id: 'culture', label: '문화예술', iconSrc: '/travel-style-icons/culture.png' },
+  { id: 'photo', label: '포토스팟', iconSrc: '/travel-style-icons/photo.png' },
+  { id: 'nightlife', label: '나이트 라이프', iconSrc: '/travel-style-icons/nightlife.png' },
 ]
 
 export const EDITORIAL_PICK = {

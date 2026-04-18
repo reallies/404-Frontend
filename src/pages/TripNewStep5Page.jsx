@@ -23,6 +23,24 @@ function SvgIcon({ name, className = 'w-6 h-6' }) {
   )
 }
 
+/** 미선택: 랜드마크 아이콘 톤(틸) · 선택: 먹방 아이콘 톤(브라운) — PNG 실루엣 후 filter로 통일 */
+const TRAVEL_STYLE_ICON_FILTER_IDLE =
+  'brightness(0) saturate(100%) invert(44%) sepia(82%) saturate(520%) hue-rotate(139deg) brightness(0.93) contrast(0.95)'
+const TRAVEL_STYLE_ICON_FILTER_SELECTED =
+  'brightness(0) saturate(100%) invert(22%) sepia(28%) saturate(1300%) hue-rotate(5deg) brightness(0.91) contrast(1.05)'
+
+function TravelStyleIcon({ src, selected, className }) {
+  return (
+    <img
+      src={src}
+      alt=""
+      className={`shrink-0 object-contain transition-[filter] duration-200 ease-out ${className ?? ''}`}
+      style={{ filter: selected ? TRAVEL_STYLE_ICON_FILTER_SELECTED : TRAVEL_STYLE_ICON_FILTER_IDLE }}
+      aria-hidden
+    />
+  )
+}
+
 function SectionLabel({ num, label }) {
   return (
     <div className="flex items-center gap-3 mb-4">
@@ -162,9 +180,11 @@ export default function TripNewStep5Page() {
                   onClick={() => toggleStyle(s.id)}
                   className={styleCardClass(s.id)}
                 >
-                  <span className="text-3xl leading-none md:text-4xl" aria-hidden>
-                    {s.emoji}
-                  </span>
+                  <TravelStyleIcon
+                    src={s.iconSrc}
+                    selected={styleIds.includes(s.id)}
+                    className="h-9 w-9 md:h-11 md:w-11"
+                  />
                   <span className="text-xs font-bold leading-tight sm:text-sm">{s.label}</span>
                 </button>
               ))}
@@ -229,9 +249,11 @@ export default function TripNewStep5Page() {
                 onClick={() => toggleStyle(s.id)}
                 className={styleCardClass(s.id)}
               >
-                <span className="text-3xl leading-none" aria-hidden>
-                  {s.emoji}
-                </span>
+                <TravelStyleIcon
+                  src={s.iconSrc}
+                  selected={styleIds.includes(s.id)}
+                  className="h-9 w-9"
+                />
                 <span className="text-xs font-bold leading-tight sm:text-sm">{s.label}</span>
               </button>
             ))}
