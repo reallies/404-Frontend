@@ -91,6 +91,8 @@ const FILTER_TABS = [
 const GA_FILTER_SHEET_DISMISS_PX = 100
 /** `animationend` 미발생(접근성·브라우저) 시에도 `closing` → `closed`로 복구 — API/애널리틱스와 무관한 UI 안전장치 */
 const GA_FILTER_SHEET_CLOSE_FALLBACK_MS = 480
+/** 열림 키프레임 `animationend` 미발생 시 `filterEnterAnimActive` 해제 */
+const GA_FILTER_SHEET_OPEN_FALLBACK_MS = 450
 
 function isDemoDesignEntry(entry) {
   return String(entry.id).startsWith('demo-design-')
@@ -112,6 +114,7 @@ function TripGuideArchiveInner({ tripId }) {
   const filterPhaseRef = useRef('closed')
   const sheetPullAmountRef = useRef(0)
   const sheetPullDragRef = useRef({ active: false, startY: 0 })
+  const filterSheetPullZoneRef = useRef(null)
   /** 상세에서 저장 시 진행률 재계산(체크 상태는 entry 스토리지에 있음) */
   const [checklistRevision, setChecklistRevision] = useState(0)
 
@@ -141,6 +144,34 @@ function TripGuideArchiveInner({ tripId }) {
       setFilterSheetPhase((prev) => (prev === 'closing' ? 'closed' : prev))
     }, GA_FILTER_SHEET_CLOSE_FALLBACK_MS)
     return () => window.clearTimeout(id)
+  }, [filterSheetPhase])
+
+  /** 열림 애니메이션 `animationend`가 없을 때도 드래그·클래스가 꼬이지 않도록 */
+  useEffect(() => {
+    if (filterSheetPhase !== 'open' || !filterEnterAnimActive) return
+    const id = window.setTimeout(() => {
+      setFilterEnterAnimActive(false)
+    }, GA_FILTER_SHEET_OPEN_FALLBACK_MS)
+    return () => window.clearTimeout(id)
+  }, [filterSheetPhase, filterEnterAnimActive])
+
+  /** `touchmove`는 기본 passive라 스크롤이 겹칠 수 있음 — 드래그 영역만 non-passive (ref 보장 위해 layout) */
+  useLayoutEffect(() => {
+    if (filterSheetPhase !== 'open') return
+    const el = filterSheetPullZoneRef.current
+    if (!el) return
+    const onMove = (e) => {
+      if (!sheetPullDragRef.current.active || filterPhaseRef.current !== 'open') return
+      if (e.touches.length === 0) return
+      const dy = e.touches[0].clientY - sheetPullDragRef.current.startY
+      if (dy > 0) {
+        setSheetPullY(dy)
+        sheetPullAmountRef.current = dy
+        e.preventDefault()
+      }
+    }
+    el.addEventListener('touchmove', onMove, { passive: false })
+    return () => el.removeEventListener('touchmove', onMove)
   }, [filterSheetPhase])
 
   useLayoutEffect(() => {
@@ -282,16 +313,6 @@ function TripGuideArchiveInner({ tripId }) {
     },
     [],
   )
-
-  const onFilterSheetPullMove = useCallback((e) => {
-    if (!sheetPullDragRef.current.active || filterPhaseRef.current !== 'open') return
-    const dy = e.touches[0].clientY - sheetPullDragRef.current.startY
-    if (dy > 0) {
-      setSheetPullY(dy)
-      sheetPullAmountRef.current = dy
-      e.preventDefault()
-    }
-  }, [])
 
   const onFilterSheetPullEnd = useCallback(() => {
     if (!sheetPullDragRef.current.active) return
@@ -481,9 +502,9 @@ function TripGuideArchiveInner({ tripId }) {
                 onAnimationEnd={onFilterSheetPanelAnimEnd}
               >
                 <div
+                  ref={filterSheetPullZoneRef}
                   className="touch-none select-none"
                   onTouchStart={onFilterSheetPullStart}
-                  onTouchMove={onFilterSheetPullMove}
                   onTouchEnd={onFilterSheetPullEnd}
                   onTouchCancel={onFilterSheetPullEnd}
                 >

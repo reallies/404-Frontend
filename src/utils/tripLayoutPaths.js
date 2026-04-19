@@ -6,8 +6,8 @@ export function normalizePathname(pathname) {
 }
 
 /**
- * 모바일에서 TripFlowMobileBar(Step2 스타일)를 쓰고 전역 Header를 숨길 경로
- * — 동일한 상단바를 쓰는 화면과 이중 헤더를 맞추기 위함
+ * 모바일에서 전역 Header 표시 여부.
+ * 예전에는 TripFlowMobileBar와 겹쳐 숨겼으나, 모바일도 전역 Header(햄버거)로 통일함.
  */
 /**
  * 모바일에서 `RootLayout`의 `<main>`에 `pb-16`(바텀 탭 대비)을 줄지.
@@ -22,13 +22,6 @@ export function shouldPadMainForMobileBottomNav(pathname) {
   return true
 }
 
-export function shouldHideGlobalHeaderOnMobile(pathname) {
-  const p = normalizePathname(pathname)
-  if (p === '/' || p === '/login' || p === '/404' || p === '/mypage') return true
-  if (/^\/trips\/new\/(step[2-5]|destination)$/.test(p)) return true
-  if (/^\/trips\/[^/]+\/search$/.test(p)) return true
-  if (/^\/trips\/[^/]+\/checklist$/.test(p)) return true
-  if (/^\/trips\/[^/]+\/guide-archive$/.test(p)) return true
-  if (/^\/trips\/[^/]+\/guide-archive\/[^/]+$/.test(p)) return true
+export function shouldHideGlobalHeaderOnMobile(_pathname) {
   return false
 }

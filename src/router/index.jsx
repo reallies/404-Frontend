@@ -3,6 +3,7 @@ import { useRoutes, Navigate } from 'react-router-dom'
 import RootLayout from '@/layouts/RootLayout'
 import HomePage from '@/pages/HomePage'
 import LoginPage from '@/pages/LoginPage'
+import SignupPage from '@/pages/SignupPage'
 import TripNewStep2Page from '@/pages/TripNewStep2Page'
 import TripNewDestinationPage from '@/pages/TripNewDestinationPage'
 import TripNewStep3Page from '@/pages/TripNewStep3Page'
@@ -47,6 +48,7 @@ const AppRoutes = () => {
       children: [
         { path: '/',                    element: <HomePage /> },
         { path: '/login',               element: <LoginPage /> },
+        { path: '/signup',              element: <SignupPage /> },
         { path: '/mypage',              element: <MyPage /> },
         { path: '/trips/new',           element: <Navigate to="/trips/new/step2" replace /> },
         { path: '/trips/new/step2',     element: <TripNewStep2Page /> },

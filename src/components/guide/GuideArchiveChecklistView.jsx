@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { loadSavedItems, setSavedItemChecked } from '@/utils/savedTripItems'
+import { loadSavedItems, removeSavedItem, setSavedItemChecked } from '@/utils/savedTripItems'
 import { patchGuideArchiveEntry } from '@/utils/guideArchiveStorage'
 import { buildGuideArchiveDateLine, buildGuideArchiveListTitle } from '@/utils/guideArchivePresentation'
 import GuideArchiveProgressBar from '@/components/guide/GuideArchiveProgressBar'
@@ -14,7 +14,7 @@ import {
  * 가이드 보관함 상세 — 이 여행 스냅샷에 담긴 필수품을 하나씩 체크하며 준비합니다.
  * 체크 상태는 entry 단위로 저장되며, 같은 trip에 다른 여행지 목록이 있어도 섞이지 않습니다.
  * 화면에서의 체크/해제는 메모리만 바꾸고, **저장 → 확인**을 눌렀을 때만 스토리지에 반영합니다(뒤로가기 시 폐기).
- * 준비물 **삭제**(선택 삭제)는 스토리지에 즉시 반영됩니다.
+ * 준비물 **삭제**(선택 삭제)는 스토리지에 즉시 반영됩니다. 보관함에서 빠진 항목 id는 탐색 저장(`savedTripItems`)에서도 제거합니다.
  * `onArchiveMutated`: 삭제 후 부모가 스토리지에서 entry를 다시 읽을 때 호출합니다.
  */
 export default function GuideArchiveChecklistView({ tripId, entry, onArchiveMutated }) {
@@ -25,10 +25,15 @@ export default function GuideArchiveChecklistView({ tripId, entry, onArchiveMuta
   const items = entry.items ?? []
   const [checks, setChecks] = useState(() => loadEntryChecklistChecks(tripId, entry.id))
 
+  const archiveItemsFingerprint = useMemo(
+    () => [...items.map((it) => String(it.id))].sort().join('|'),
+    [items],
+  )
+
   useEffect(() => {
-    seedEntryChecksFromSavedIfEmpty(tripId, entry.id, loadSavedItems(tripId), entry.items)
+    seedEntryChecksFromSavedIfEmpty(tripId, entry.id, loadSavedItems(tripId), items)
     setChecks(loadEntryChecklistChecks(tripId, entry.id))
-  }, [tripId, entry.id, items.length])
+  }, [tripId, entry.id, archiveItemsFingerprint, items])
 
   useEffect(() => {
     if (items.length === 0) {
@@ -73,6 +78,11 @@ export default function GuideArchiveChecklistView({ tripId, entry, onArchiveMuta
 
   const persistItemsAndChecks = useCallback(
     (newItems, nextChecks) => {
+      const nextIds = new Set(newItems.map((it) => String(it.id)))
+      for (const it of items) {
+        const id = String(it.id)
+        if (!nextIds.has(id)) removeSavedItem(tripId, id)
+      }
       const totalN = newItems.length
       const checkedN = newItems.filter((it) => nextChecks[String(it.id)]).length
       const progressN = totalN > 0 ? Math.round((checkedN / totalN) * 100) : 0
@@ -86,7 +96,7 @@ export default function GuideArchiveChecklistView({ tripId, entry, onArchiveMuta
       exitDeleteMode()
       onArchiveMutated?.()
     },
-    [tripId, entry.id, exitDeleteMode, onArchiveMutated],
+    [tripId, entry.id, items, exitDeleteMode, onArchiveMutated],
   )
 
   const handleDeleteSelectedItems = useCallback(() => {

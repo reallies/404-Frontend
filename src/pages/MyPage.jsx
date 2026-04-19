@@ -1,5 +1,3 @@
-import { TripFlowMobileBar } from '@/components/common/TripFlowTopBar'
-
 const PAGE_BG = {
   background: 'linear-gradient(180deg, #E0F7FA 0%, #F8FAFC 55%, #F0FDFA 100%)',
 }
@@ -7,8 +5,6 @@ const PAGE_BG = {
 function MyPage() {
   return (
     <div className="flex min-h-full w-full flex-1 flex-col" style={PAGE_BG}>
-      <TripFlowMobileBar backTo="/" />
-
       <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-5 pb-28 pt-6 md:hidden">
         <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-cyan-600">My page</p>
         <h1 className="mb-2 text-2xl font-extrabold text-gray-900">마이페이지</h1>
