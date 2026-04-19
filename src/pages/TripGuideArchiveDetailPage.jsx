@@ -1,4 +1,5 @@
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
+import { useMemo, useState } from 'react'
 import { getGuideArchiveEntry } from '@/utils/guideArchiveStorage'
 import GuideArchiveChecklistView from '@/components/guide/GuideArchiveChecklistView'
 import { TripFlowMobileBar } from '@/components/common/TripFlowTopBar'
@@ -11,7 +12,12 @@ import { TripFlowMobileBar } from '@/components/common/TripFlowTopBar'
 
 function TripGuideArchiveDetailInner({ tripId, entryId }) {
   const navigate = useNavigate()
-  const entry = getGuideArchiveEntry(tripId, entryId)
+  /** 상세에서 준비물 삭제(patch) 후 목록을 스토리지에서 다시 읽기 위해 */
+  const [archiveRevision, setArchiveRevision] = useState(0)
+  const entry = useMemo(
+    () => getGuideArchiveEntry(tripId, entryId),
+    [tripId, entryId, archiveRevision],
+  )
 
   if (!entry) {
     return (
@@ -58,24 +64,20 @@ function TripGuideArchiveDetailInner({ tripId, entryId }) {
     >
       <TripFlowMobileBar backTo={`/trips/${tripId}/guide-archive`} />
 
-      <div className="mx-auto hidden max-w-6xl flex-wrap items-center gap-3 px-4 pt-6 md:flex md:pt-8">
+      <div className="mx-auto hidden max-w-6xl items-center px-4 pt-6 md:flex md:pt-8">
         <button
           type="button"
           onClick={() => navigate(`/trips/${tripId}/guide-archive`)}
-          className="text-sm text-teal-700 hover:text-teal-900 font-medium"
+          className="text-sm font-medium text-teal-700 hover:text-teal-900"
         >
           ← 나의 체크리스트로
         </button>
-        <span className="text-gray-300">|</span>
-        <button
-          type="button"
-          onClick={() => navigate(`/trips/${tripId}/search`)}
-          className="text-sm text-gray-600 hover:text-gray-900 font-medium"
-        >
-          맞춤 여행 준비 리스트
-        </button>
       </div>
-      <GuideArchiveChecklistView tripId={tripId} entry={entry} />
+      <GuideArchiveChecklistView
+        tripId={tripId}
+        entry={entry}
+        onArchiveMutated={() => setArchiveRevision((n) => n + 1)}
+      />
     </div>
   )
 }

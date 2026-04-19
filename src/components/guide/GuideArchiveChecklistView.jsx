@@ -6,17 +6,22 @@ import { buildGuideArchiveDateLine, buildGuideArchiveListTitle } from '@/utils/g
 import GuideArchiveProgressBar from '@/components/guide/GuideArchiveProgressBar'
 import {
   loadEntryChecklistChecks,
+  saveEntryChecklistChecks,
   seedEntryChecksFromSavedIfEmpty,
-  setEntryChecklistItemChecked,
 } from '@/utils/guideArchiveEntryChecklistStorage'
 
 /**
  * 가이드 보관함 상세 — 이 여행 스냅샷에 담긴 필수품을 하나씩 체크하며 준비합니다.
- * 체크 상태는 entry 단위로 저장되어, 같은 trip에 다른 여행지 목록이 있어도 섞이지 않습니다.
+ * 체크 상태는 entry 단위로 저장되며, 같은 trip에 다른 여행지 목록이 있어도 섞이지 않습니다.
+ * 화면에서의 체크/해제는 메모리만 바꾸고, **저장 → 확인**을 눌렀을 때만 스토리지에 반영합니다(뒤로가기 시 폐기).
+ * 준비물 **삭제**(선택 삭제)는 스토리지에 즉시 반영됩니다.
+ * `onArchiveMutated`: 삭제 후 부모가 스토리지에서 entry를 다시 읽을 때 호출합니다.
  */
-export default function GuideArchiveChecklistView({ tripId, entry }) {
+export default function GuideArchiveChecklistView({ tripId, entry, onArchiveMutated }) {
   const navigate = useNavigate()
   const [saveConfirmOpen, setSaveConfirmOpen] = useState(false)
+  const [deleteMode, setDeleteMode] = useState(false)
+  const [selectedItemIdsForDelete, setSelectedItemIdsForDelete] = useState([])
   const items = entry.items ?? []
   const [checks, setChecks] = useState(() => loadEntryChecklistChecks(tripId, entry.id))
 
@@ -24,6 +29,13 @@ export default function GuideArchiveChecklistView({ tripId, entry }) {
     seedEntryChecksFromSavedIfEmpty(tripId, entry.id, loadSavedItems(tripId), entry.items)
     setChecks(loadEntryChecklistChecks(tripId, entry.id))
   }, [tripId, entry.id, items.length])
+
+  useEffect(() => {
+    if (items.length === 0) {
+      setDeleteMode(false)
+      setSelectedItemIdsForDelete([])
+    }
+  }, [items.length])
 
   const grouped = useMemo(() => {
     const map = new Map()
@@ -39,18 +51,73 @@ export default function GuideArchiveChecklistView({ tripId, entry }) {
   const checkedCount = useMemo(() => items.filter((it) => checks[String(it.id)]).length, [items, checks])
   const progress = total > 0 ? Math.round((checkedCount / total) * 100) : 0
 
-  const handleToggle = useCallback(
-    (itemId) => {
-      const id = String(itemId)
-      const nextVal = !checks[id]
-      setChecks((prev) => ({ ...prev, [id]: nextVal }))
-      setEntryChecklistItemChecked(tripId, entry.id, id, nextVal)
-      setSavedItemChecked(tripId, id, nextVal)
+  const handleToggle = useCallback((itemId) => {
+    const id = String(itemId)
+    setChecks((prev) => ({ ...prev, [id]: !prev[id] }))
+  }, [])
+
+  const toggleItemSelectForDelete = useCallback((itemId) => {
+    const id = String(itemId)
+    setSelectedItemIdsForDelete((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+  }, [])
+
+  const exitDeleteMode = useCallback(() => {
+    setDeleteMode(false)
+    setSelectedItemIdsForDelete([])
+  }, [])
+
+  const enterDeleteMode = useCallback(() => {
+    setDeleteMode(true)
+    setSelectedItemIdsForDelete([])
+  }, [])
+
+  const persistItemsAndChecks = useCallback(
+    (newItems, nextChecks) => {
+      const totalN = newItems.length
+      const checkedN = newItems.filter((it) => nextChecks[String(it.id)]).length
+      const progressN = totalN > 0 ? Math.round((checkedN / totalN) * 100) : 0
+      saveEntryChecklistChecks(tripId, entry.id, nextChecks)
+      patchGuideArchiveEntry(tripId, entry.id, {
+        items: newItems,
+        checklistProgressPercent: progressN,
+        checklistSavedAt: new Date().toISOString(),
+      })
+      setChecks(nextChecks)
+      exitDeleteMode()
+      onArchiveMutated?.()
     },
-    [checks, tripId, entry.id],
+    [tripId, entry.id, exitDeleteMode, onArchiveMutated],
   )
 
+  const handleDeleteSelectedItems = useCallback(() => {
+    if (selectedItemIdsForDelete.length === 0) return
+    if (
+      !window.confirm(
+        `선택한 ${selectedItemIdsForDelete.length}개 필수품을 이 체크리스트에서 삭제할까요? 되돌릴 수 없습니다.`,
+      )
+    ) {
+      return
+    }
+    const drop = new Set(selectedItemIdsForDelete)
+    const newItems = items.filter((it) => !drop.has(String(it.id)))
+    const nextChecks = {}
+    for (const it of newItems) {
+      const id = String(it.id)
+      nextChecks[id] = Boolean(checks[id])
+    }
+    persistItemsAndChecks(newItems, nextChecks)
+  }, [selectedItemIdsForDelete, items, checks, persistItemsAndChecks])
+
   const performSave = useCallback(() => {
+    const persisted = {}
+    for (const it of items) {
+      const id = String(it.id)
+      persisted[id] = Boolean(checks[id])
+    }
+    saveEntryChecklistChecks(tripId, entry.id, persisted)
+    for (const it of items) {
+      setSavedItemChecked(tripId, String(it.id), Boolean(checks[String(it.id)]))
+    }
     patchGuideArchiveEntry(tripId, entry.id, {
       checklistProgressPercent: progress,
       checklistSavedAt: new Date().toISOString(),
@@ -62,7 +129,7 @@ export default function GuideArchiveChecklistView({ tripId, entry }) {
     )
     setSaveConfirmOpen(false)
     navigate(`/trips/${tripId}/guide-archive`)
-  }, [tripId, entry.id, progress, navigate])
+  }, [tripId, entry.id, items, checks, progress, navigate])
 
   const handleBack = useCallback(() => {
     navigate(-1)
@@ -175,6 +242,15 @@ export default function GuideArchiveChecklistView({ tripId, entry }) {
         </p>
       </header>
 
+      <div className="mb-4 flex flex-wrap items-center justify-end gap-2">
+        <Link
+          to={`/trips/${tripId}/checklist`}
+          className="inline-flex items-center rounded-2xl border-2 border-fuchsia-400/90 bg-gradient-to-br from-violet-600 via-fuchsia-600 to-orange-500 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-fuchsia-500/40 ring-2 ring-white/50 transition hover:brightness-110 hover:shadow-xl hover:shadow-fuchsia-500/30 active:scale-[0.98]"
+        >
+          이전 화면 UI 보기
+        </Link>
+      </div>
+
       <div className="sticky top-0 z-20 -mx-5 mb-6 border-b border-slate-100/90 bg-white px-5 py-3 backdrop-blur-sm md:static md:mx-0 md:rounded-xl md:border md:border-slate-100 md:bg-white md:px-5 md:py-4 md:shadow-sm">
         <div className="mb-1.5 flex items-center justify-between gap-3 text-xs font-semibold text-slate-600">
           <span>
@@ -188,19 +264,40 @@ export default function GuideArchiveChecklistView({ tripId, entry }) {
         <GuideArchiveProgressBar value={progress} />
       </div>
 
-      <div className="mb-6 flex flex-wrap gap-2">
+      <div className="mb-6 flex w-full flex-wrap items-center justify-between gap-2">
         <Link
           to={`/trips/${tripId}/search?archiveEntry=${encodeURIComponent(entry.id)}`}
           className="inline-flex items-center rounded-2xl bg-amber-400 px-4 py-2.5 text-sm font-bold text-gray-900 shadow-sm transition-all hover:bg-amber-500 hover:shadow-md active:scale-[0.98]"
         >
-          준비물 더 검색·담기
+          필수품 추가
         </Link>
-        <Link
-          to={`/trips/${tripId}/checklist`}
-          className="inline-flex items-center rounded-2xl border-2 border-fuchsia-400/90 bg-gradient-to-br from-violet-600 via-fuchsia-600 to-orange-500 px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-fuchsia-500/40 ring-2 ring-white/50 transition hover:brightness-110 hover:shadow-xl hover:shadow-fuchsia-500/30 active:scale-[0.98]"
-        >
-          이전 화면 UI 보기
-        </Link>
+        {!deleteMode ? (
+          <button
+            type="button"
+            onClick={enterDeleteMode}
+            className="ml-auto shrink-0 rounded-xl border border-red-200 bg-white px-4 py-2.5 text-sm font-bold text-red-700 shadow-sm transition-colors hover:bg-red-50"
+          >
+            삭제
+          </button>
+        ) : (
+          <div className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={handleDeleteSelectedItems}
+              disabled={selectedItemIdsForDelete.length === 0}
+              className="shrink-0 rounded-xl border border-red-300 bg-red-50 px-4 py-2.5 text-sm font-bold text-red-800 shadow-sm transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              선택한 필수품 삭제
+            </button>
+            <button
+              type="button"
+              onClick={exitDeleteMode}
+              className="shrink-0 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+            >
+              취소
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="space-y-8">
@@ -211,36 +308,47 @@ export default function GuideArchiveChecklistView({ tripId, entry }) {
               {list.map((it) => {
                 const id = String(it.id)
                 const on = Boolean(checks[id])
+                const showCheckedStyle = !deleteMode && on
+                const isDelSelected = selectedItemIdsForDelete.includes(id)
                 return (
                   <li key={id}>
                     <label
                       className={`flex cursor-pointer gap-3 rounded-2xl border-2 px-4 py-3.5 transition-all duration-200 ${
-                        on
-                          ? 'border-amber-400 bg-amber-200/95 shadow-sm ring-1 ring-amber-300/70'
-                          : 'border-gray-100 bg-white/95 shadow-sm hover:bg-cyan-50/80'
+                        deleteMode
+                          ? isDelSelected
+                            ? 'border-teal-400 bg-cyan-50/95 shadow-sm ring-2 ring-teal-500 ring-offset-2'
+                            : 'border-gray-100 bg-white/95 shadow-sm hover:bg-cyan-50/80'
+                          : on
+                            ? 'border-amber-400 bg-amber-200/95 shadow-sm ring-1 ring-amber-300/70'
+                            : 'border-gray-100 bg-white/95 shadow-sm hover:bg-cyan-50/80'
                       }`}
                     >
                       <input
                         type="checkbox"
-                        checked={on}
-                        onChange={() => handleToggle(it.id)}
-                        className="mt-1 h-5 w-5 shrink-0 rounded border-gray-300 accent-amber-600"
+                        checked={deleteMode ? isDelSelected : on}
+                        onChange={() => (deleteMode ? toggleItemSelectForDelete(it.id) : handleToggle(it.id))}
+                        aria-label={deleteMode ? `삭제 대상 ${isDelSelected ? '해제' : '선택'}` : undefined}
+                        className={`mt-1 h-5 w-5 shrink-0 rounded border-gray-300 ${deleteMode ? 'accent-teal-600' : 'accent-amber-600'}`}
                       />
                       <span className="min-w-0 flex-1">
                         <span
-                          className={`block text-sm font-extrabold ${on ? 'text-gray-900 line-through decoration-amber-700/45' : 'text-gray-900'}`}
+                          className={`block text-sm font-extrabold ${
+                            showCheckedStyle ? 'text-gray-900 line-through decoration-amber-700/45' : 'text-gray-900'
+                          }`}
                         >
                           {it.title}
                         </span>
                         {it.description ? (
-                          <span className={`mt-1 block text-xs leading-relaxed ${on ? 'text-gray-700' : 'text-gray-600'}`}>
+                          <span
+                            className={`mt-1 block text-xs leading-relaxed ${showCheckedStyle ? 'text-gray-700' : 'text-gray-600'}`}
+                          >
                             {it.description}
                           </span>
                         ) : null}
                         {it.detail ? (
                           <span
                             className={`mt-2 block border-l-2 pl-2 text-xs leading-relaxed ${
-                              on ? 'border-amber-300 text-gray-700' : 'border-cyan-200 text-gray-500'
+                              showCheckedStyle ? 'border-amber-300 text-gray-700' : 'border-cyan-200 text-gray-500'
                             }`}
                           >
                             {it.detail}

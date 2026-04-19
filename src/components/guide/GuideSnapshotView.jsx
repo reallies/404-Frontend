@@ -41,7 +41,7 @@ export default function GuideSnapshotView({ entry }) {
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 md:py-10">
       <div className="mb-8">
-        <p className="text-xs font-bold tracking-widest text-teal-600 uppercase mb-1">저장된 맞춤 여행 준비 리스트</p>
+        <p className="text-xs font-bold tracking-widest text-teal-600 uppercase mb-1">저장된 맞춤 여행 체크리스트</p>
         <h1 className="text-2xl md:text-3xl font-extrabold text-gray-900 leading-tight">{entry.pageTitle}</h1>
         {entry.pageSubtitle ? (
           <p className="mt-2 text-sm text-gray-600 max-w-2xl leading-relaxed">{entry.pageSubtitle}</p>

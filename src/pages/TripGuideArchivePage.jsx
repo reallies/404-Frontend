@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useLayoutEffect, useMemo, useCallback, useRef } from 'react'
 import { useParams, useLocation, Link, useSearchParams } from 'react-router-dom'
 import { loadGuideArchive, removeGuideArchiveEntriesByIds } from '@/utils/guideArchiveStorage'
 import { loadSavedItems } from '@/utils/savedTripItems'
@@ -60,12 +60,37 @@ function ChevronRightIcon({ className = 'h-5 w-5' }) {
   )
 }
 
+/** 모바일 필터 트리거 — 리스트/슬라이더 형태 필터 아이콘 */
+function FilterIcon({ className = 'h-6 w-6' }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <line x1="4" y1="6" x2="20" y2="6" />
+      <line x1="7" y1="12" x2="17" y2="12" />
+      <line x1="10" y1="18" x2="14" y2="18" />
+    </svg>
+  )
+}
+
 const FILTER_TABS = [
   { id: 'all', label: '전체' },
   { id: 'draft', label: '미작성' },
   { id: 'writing', label: '작성중' },
   { id: 'completed', label: '완료' },
 ]
+
+/** 모바일 필터 시트: 아래로 이 정도 이상 드래그 시 닫음 */
+const GA_FILTER_SHEET_DISMISS_PX = 100
+/** `animationend` 미발생(접근성·브라우저) 시에도 `closing` → `closed`로 복구 — API/애널리틱스와 무관한 UI 안전장치 */
+const GA_FILTER_SHEET_CLOSE_FALLBACK_MS = 480
 
 function isDemoDesignEntry(entry) {
   return String(entry.id).startsWith('demo-design-')
@@ -79,8 +104,52 @@ function TripGuideArchiveInner({ tripId }) {
   const [filterTab, setFilterTab] = useState('all')
   const [deleteMode, setDeleteMode] = useState(false)
   const [selectedEntryIds, setSelectedEntryIds] = useState([])
+  /** 모바일: 필터 시트 — closed | open | closing(닫힘 애니메이션) */
+  const [filterSheetPhase, setFilterSheetPhase] = useState('closed')
+  const [filterEnterAnimActive, setFilterEnterAnimActive] = useState(false)
+  const [sheetPullY, setSheetPullY] = useState(0)
+  const [sheetPullDragging, setSheetPullDragging] = useState(false)
+  const filterPhaseRef = useRef('closed')
+  const sheetPullAmountRef = useRef(0)
+  const sheetPullDragRef = useRef({ active: false, startY: 0 })
   /** 상세에서 저장 시 진행률 재계산(체크 상태는 entry 스토리지에 있음) */
   const [checklistRevision, setChecklistRevision] = useState(0)
+
+  const activeFilterLabel = FILTER_TABS.find((t) => t.id === filterTab)?.label ?? '전체'
+
+  const openFilterSheet = useCallback(() => {
+    setFilterEnterAnimActive(true)
+    setFilterSheetPhase((p) => (p === 'closed' ? 'open' : p))
+  }, [])
+
+  const closeFilterSheet = useCallback(() => {
+    setSheetPullY(0)
+    sheetPullAmountRef.current = 0
+    sheetPullDragRef.current.active = false
+    setSheetPullDragging(false)
+    setFilterSheetPhase((p) => (p === 'open' ? 'closing' : p))
+  }, [])
+
+  useEffect(() => {
+    filterPhaseRef.current = filterSheetPhase
+  }, [filterSheetPhase])
+
+  /** 닫힘 CSS 애니메이션의 `animationend`가 오지 않아도 스크롤 잠금·상태가 풀리도록 백업 */
+  useEffect(() => {
+    if (filterSheetPhase !== 'closing') return
+    const id = window.setTimeout(() => {
+      setFilterSheetPhase((prev) => (prev === 'closing' ? 'closed' : prev))
+    }, GA_FILTER_SHEET_CLOSE_FALLBACK_MS)
+    return () => window.clearTimeout(id)
+  }, [filterSheetPhase])
+
+  useLayoutEffect(() => {
+    if (filterSheetPhase !== 'open') return
+    setSheetPullY(0)
+    sheetPullAmountRef.current = 0
+    setSheetPullDragging(false)
+    sheetPullDragRef.current.active = false
+  }, [filterSheetPhase])
 
   const refreshFromStorage = useCallback(() => {
     setEntries(loadGuideArchive(tripId))
@@ -175,6 +244,79 @@ function TripGuideArchiveInner({ tripId }) {
     }
   }, [entries.length])
 
+  useEffect(() => {
+    if (filterSheetPhase === 'closed') return
+    const onKey = (e) => {
+      if (e.key === 'Escape') closeFilterSheet()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [filterSheetPhase, closeFilterSheet])
+
+  useEffect(() => {
+    if (filterSheetPhase === 'closed') return
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = prev
+    }
+  }, [filterSheetPhase])
+
+  useEffect(() => {
+    const onResize = () => {
+      if (typeof window.matchMedia === 'function' && window.matchMedia('(min-width: 768px)').matches) {
+        setFilterSheetPhase('closed')
+        setSheetPullY(0)
+        sheetPullAmountRef.current = 0
+      }
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
+  const onFilterSheetPullStart = useCallback(
+    (e) => {
+      if (filterPhaseRef.current !== 'open') return
+      sheetPullDragRef.current = { active: true, startY: e.touches[0].clientY }
+      setSheetPullDragging(true)
+    },
+    [],
+  )
+
+  const onFilterSheetPullMove = useCallback((e) => {
+    if (!sheetPullDragRef.current.active || filterPhaseRef.current !== 'open') return
+    const dy = e.touches[0].clientY - sheetPullDragRef.current.startY
+    if (dy > 0) {
+      setSheetPullY(dy)
+      sheetPullAmountRef.current = dy
+      e.preventDefault()
+    }
+  }, [])
+
+  const onFilterSheetPullEnd = useCallback(() => {
+    if (!sheetPullDragRef.current.active) return
+    sheetPullDragRef.current.active = false
+    setSheetPullDragging(false)
+    const d = sheetPullAmountRef.current
+    if (d >= GA_FILTER_SHEET_DISMISS_PX) {
+      closeFilterSheet()
+    } else {
+      setSheetPullY(0)
+    }
+    sheetPullAmountRef.current = 0
+  }, [closeFilterSheet])
+
+  const onFilterSheetPanelAnimEnd = useCallback((e) => {
+    const name = e.animationName
+    if (name === 'guide-archive-filter-sheet-down' && filterPhaseRef.current === 'closing') {
+      setFilterSheetPhase('closed')
+      return
+    }
+    if (name === 'guide-archive-filter-sheet-up' && filterPhaseRef.current === 'open') {
+      setFilterEnterAnimActive(false)
+    }
+  }, [])
+
   return (
     <div
       className="min-h-screen"
@@ -221,108 +363,180 @@ function TripGuideArchiveInner({ tripId }) {
             >
               {demosActive ? '예시 닫기 (원래 목록)' : '예시 불러오기 (0% · 50% · 100%)'}
             </button>
-            {entries.length > 0 && !deleteMode && (
-              <button
-                type="button"
-                onClick={enterDeleteMode}
-                className="rounded-xl border border-red-200 bg-white px-4 py-2.5 text-sm font-bold text-red-700 shadow-sm transition-colors hover:bg-red-50"
-              >
-                삭제
-              </button>
-            )}
-            {entries.length > 0 && deleteMode && (
-              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-                <button
-                  type="button"
-                  onClick={handleSelectAllEntries}
-                  className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-800 shadow-sm transition-colors hover:bg-slate-50"
-                >
-                  {allEntriesSelected ? '전체 해제' : '전체선택'}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDeleteSelected}
-                  disabled={selectedEntryIds.length === 0}
-                  className="rounded-xl border border-red-300 bg-red-50 px-4 py-2.5 text-sm font-bold text-red-800 shadow-sm transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  선택한 목록 삭제
-                </button>
-                <button
-                  type="button"
-                  onClick={exitDeleteMode}
-                  className="rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-bold text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
-                >
-                  취소
-                </button>
-              </div>
-            )}
           </div>
         </div>
       </div>
 
-      {/* 탭 (모바일·웹 공통, 스타일만 반응형) */}
-      <div className="mx-auto max-w-5xl px-4 md:px-8">
+      {/* 탭 + 삭제 — md+: 인라인 탭 / 모바일: 필터 버튼 + 커튼 시트 (시트 열릴 때 z를 낮춰 백드롭·시트 아래로) */}
+      <div className="relative mx-auto max-w-5xl px-4 md:px-8">
         <div
-          className="flex flex-wrap gap-1 rounded-full border border-slate-200/80 bg-white/90 p-1 shadow-sm md:mt-2 md:inline-flex md:border-slate-200 md:bg-slate-50/80"
-          role="tablist"
-          aria-label="체크리스트 필터"
+          className={`relative mt-3 flex w-full items-center gap-2 max-md:flex-nowrap md:flex-wrap md:mt-2 ${
+            filterSheetPhase !== 'closed' ? 'z-0 max-md:pointer-events-none' : 'z-10'
+          }`}
         >
-          {FILTER_TABS.map((tab) => {
-            const active = filterTab === tab.id
-            return (
+          <button
+            type="button"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-teal-100/90 bg-white/95 text-teal-800 shadow-sm ring-1 ring-teal-50/80 transition-colors hover:bg-teal-50/60 active:bg-teal-100/50 md:hidden"
+            onClick={openFilterSheet}
+            aria-expanded={filterSheetPhase === 'open'}
+            aria-haspopup="dialog"
+            aria-controls="guide-archive-filter-sheet"
+            aria-label={`체크리스트 필터 (${activeFilterLabel})`}
+          >
+            <FilterIcon className="h-6 w-6" />
+          </button>
+
+          <div
+            className="hidden flex-wrap gap-1 rounded-full border border-slate-200/80 bg-white/90 p-1 shadow-sm md:inline-flex md:border-slate-200 md:bg-slate-50/80"
+            role="tablist"
+            aria-label="체크리스트 필터"
+          >
+            {FILTER_TABS.map((tab) => {
+              const active = filterTab === tab.id
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setFilterTab(tab.id)}
+                  className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors md:px-6 md:py-2.5 ${
+                    active
+                      ? 'bg-slate-200/90 text-slate-900 shadow-sm md:bg-sky-100 md:text-sky-950'
+                      : 'text-slate-500 hover:text-slate-800 md:text-slate-600'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              )
+            })}
+          </div>
+
+          {entries.length > 0 && !deleteMode ? (
+            <button
+              type="button"
+              onClick={enterDeleteMode}
+              className="ml-auto shrink-0 rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-bold text-red-700 shadow-sm transition-colors hover:bg-red-50 md:rounded-xl md:px-4 md:py-2.5 md:text-sm"
+            >
+              삭제
+            </button>
+          ) : null}
+          {entries.length > 0 && deleteMode ? (
+            <div className="ml-auto flex min-w-0 max-w-full shrink-0 items-center justify-end gap-1.5 max-md:flex-1 max-md:flex-nowrap max-md:overflow-x-auto max-md:scrollbar-hide md:flex-wrap md:gap-2">
               <button
-                key={tab.id}
                 type="button"
-                role="tab"
-                aria-selected={active}
-                onClick={() => setFilterTab(tab.id)}
-                className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors md:px-6 md:py-2.5 ${
-                  active
-                    ? 'bg-slate-200/90 text-slate-900 shadow-sm md:bg-sky-100 md:text-sky-950'
-                    : 'text-slate-500 hover:text-slate-800 md:text-slate-600'
-                }`}
+                onClick={handleSelectAllEntries}
+                className="shrink-0 rounded-lg border border-slate-300 bg-white px-2 py-2 text-[11px] font-bold text-slate-800 shadow-sm transition-colors hover:bg-slate-50 max-md:whitespace-nowrap md:rounded-xl md:px-4 md:py-2.5 md:text-sm"
               >
-                {tab.label}
+                {allEntriesSelected ? '전체 해제' : '전체선택'}
               </button>
-            )
-          })}
+              <button
+                type="button"
+                onClick={handleDeleteSelected}
+                disabled={selectedEntryIds.length === 0}
+                className="shrink-0 rounded-lg border border-red-300 bg-red-50 px-2 py-2 text-[11px] font-bold text-red-800 shadow-sm transition-colors hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-40 max-md:whitespace-nowrap md:rounded-xl md:px-4 md:py-2.5 md:text-sm"
+              >
+                선택한 목록 삭제
+              </button>
+              <button
+                type="button"
+                onClick={exitDeleteMode}
+                className="shrink-0 rounded-lg border border-gray-200 bg-white px-2 py-2 text-[11px] font-bold text-gray-700 shadow-sm transition-colors hover:bg-gray-50 max-md:whitespace-nowrap md:rounded-xl md:px-4 md:py-2.5 md:text-sm"
+              >
+                취소
+              </button>
+            </div>
+          ) : null}
         </div>
 
-        {/* 모바일: 삭제 / 선택 도구 */}
-        {entries.length > 0 && (
-          <div className="mt-3 flex flex-col gap-2 md:hidden">
-            {!deleteMode ? (
-              <button
-                type="button"
-                onClick={enterDeleteMode}
-                className="self-end rounded-lg border border-red-200 bg-white px-3 py-2 text-xs font-bold text-red-700 shadow-sm"
+        {filterSheetPhase !== 'closed' ? (
+          <>
+            <button
+              type="button"
+              className={`fixed inset-0 z-[100] bg-teal-950/35 backdrop-blur-[2px] transition-opacity duration-200 md:hidden ${
+                filterSheetPhase === 'closing' ? 'opacity-0' : 'opacity-100'
+              }`}
+              aria-label="필터 닫기"
+              onClick={closeFilterSheet}
+            />
+            <div
+              id="guide-archive-filter-sheet"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="guide-archive-filter-sheet-title"
+              className="fixed inset-x-0 bottom-0 z-[110] px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2 md:hidden"
+              style={
+                filterSheetPhase === 'open'
+                  ? {
+                      transform: sheetPullY > 0 ? `translateY(${sheetPullY}px)` : undefined,
+                      transition: sheetPullDragging ? 'none' : 'transform 0.26s cubic-bezier(0.22, 1, 0.36, 1)',
+                    }
+                  : undefined
+              }
+            >
+              <div
+                className={`mx-auto max-w-lg overflow-hidden rounded-t-[1.75rem] border border-b-0 border-teal-200/70 bg-gradient-to-t from-teal-50/50 via-white to-white shadow-[0_-20px_48px_-12px_rgba(13,148,136,0.28)] ${
+                  filterSheetPhase === 'open' && filterEnterAnimActive ? 'guide-archive-filter-sheet-up' : ''
+                }${filterSheetPhase === 'closing' ? ' guide-archive-filter-sheet-down' : ''}`}
+                onAnimationEnd={onFilterSheetPanelAnimEnd}
               >
-                삭제
-              </button>
-            ) : (
-              <div className="flex flex-wrap items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={handleSelectAllEntries}
-                  className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-800"
+                <div
+                  className="touch-none select-none"
+                  onTouchStart={onFilterSheetPullStart}
+                  onTouchMove={onFilterSheetPullMove}
+                  onTouchEnd={onFilterSheetPullEnd}
+                  onTouchCancel={onFilterSheetPullEnd}
                 >
-                  {allEntriesSelected ? '전체 해제' : '전체선택'}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDeleteSelected}
-                  disabled={selectedEntryIds.length === 0}
-                  className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-xs font-bold text-red-800 disabled:opacity-40"
-                >
-                  선택한 목록 삭제
-                </button>
-                <button type="button" onClick={exitDeleteMode} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-bold text-gray-700">
-                  취소
-                </button>
+                  <div className="flex justify-center pt-2" aria-hidden>
+                    <span className="h-1 w-10 rounded-full bg-slate-300/80" />
+                  </div>
+                  <div className="flex items-center justify-between gap-3 border-b border-teal-100/90 px-4 py-3">
+                    <h2 id="guide-archive-filter-sheet-title" className="text-base font-extrabold tracking-tight text-[#0a3d3d]">
+                      체크리스트 필터
+                    </h2>
+                    <button
+                      type="button"
+                      onClick={closeFilterSheet}
+                      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-teal-100 bg-white text-lg font-bold leading-none text-teal-800 shadow-sm transition-colors hover:bg-teal-50 active:scale-95"
+                      aria-label="닫기"
+                    >
+                      ×
+                    </button>
+                  </div>
+                </div>
+                <ul className="flex flex-col gap-1.5 p-3 pb-5" aria-label="진행 상태별 보기">
+                  {FILTER_TABS.map((tab) => {
+                    const active = filterTab === tab.id
+                    return (
+                      <li key={tab.id}>
+                        <button
+                          type="button"
+                          aria-selected={active}
+                          onClick={() => {
+                            setFilterTab(tab.id)
+                            closeFilterSheet()
+                          }}
+                          className={`flex w-full items-center justify-between gap-3 rounded-2xl px-4 py-3.5 text-left text-sm font-bold transition-all active:scale-[0.99] ${
+                            active
+                              ? 'bg-gradient-to-r from-teal-600 to-teal-700 text-white shadow-md shadow-teal-900/15'
+                              : 'border border-transparent bg-white/90 text-slate-800 hover:border-teal-100 hover:bg-teal-50/60'
+                          }`}
+                        >
+                          <span>{tab.label}</span>
+                          {active ? (
+                            <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-white/95">
+                              적용 중
+                            </span>
+                          ) : null}
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
               </div>
-            )}
-          </div>
-        )}
+            </div>
+          </>
+        ) : null}
       </div>
 
       {/* 목록 */}
@@ -446,7 +660,7 @@ function TripGuideArchiveInner({ tripId }) {
                 ) : (
                   <Link to={`/trips/${tripId}/guide-archive/${entry.id}`} className={`group ${shellClass}`}>
                     {cardInner}
-                  </Link>
+                </Link>
                 )
 
               return (
@@ -467,7 +681,7 @@ function TripGuideArchiveInner({ tripId }) {
                   ) : (
                     cardBlock
                   )}
-                </li>
+              </li>
               )
             })}
           </ul>

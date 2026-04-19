@@ -56,3 +56,34 @@ body {
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* 가이드 보관함 목록 — 모바일 필터 시트(하단에서 올라옴) */
+@keyframes guide-archive-filter-sheet-up {
+  from {
+    transform: translateY(108%);
+    opacity: 0.88;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.guide-archive-filter-sheet-up {
+  animation: guide-archive-filter-sheet-up 0.34s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes guide-archive-filter-sheet-down {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(108%);
+    opacity: 0.82;
+  }
+}
+
+.guide-archive-filter-sheet-down {
+  animation: guide-archive-filter-sheet-down 0.32s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}

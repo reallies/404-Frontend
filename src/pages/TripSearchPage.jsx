@@ -6,6 +6,7 @@ import { buildTripWindowLabelFromRange } from '@/utils/tripDateFormat'
 import { appendGuideArchiveEntry, getGuideArchiveEntry, patchGuideArchiveEntry } from '@/utils/guideArchiveStorage'
 import { loadEntryChecklistChecks, saveEntryChecklistChecks } from '@/utils/guideArchiveEntryChecklistStorage'
 import { loadActiveTripPlan } from '@/utils/tripPlanContextStorage'
+import { buildGuideArchiveListTitle } from '@/utils/guideArchivePresentation'
 import { TripFlowMobileBar } from '@/components/common/TripFlowTopBar'
 import aiSparklesImg from '@/assets/ai-sparkles.png'
 
@@ -59,6 +60,10 @@ function TripSearchInner({ tripId }) {
   )
   const mergeToArchive = Boolean(archiveEntryId && archiveEntry)
   const archiveTargetMissing = Boolean(archiveEntryId && !archiveEntry)
+
+  /** 병합 모드: 보관함에서 연 “여행 필수품 추가” 화면 전용 카피 */
+  const pageMainTitle = mergeToArchive ? '여행 필수품 추가' : TRIP_SEARCH_CONTEXT.title
+  const sectionHeading = mergeToArchive ? '카테고리별 추가 선택' : '카테고리별 필수품'
   const existingArchiveItemIds = useMemo(
     () => new Set((mergeToArchive ? archiveEntry.items ?? [] : []).map((i) => String(i.id))),
     [mergeToArchive, archiveEntry],
@@ -296,30 +301,28 @@ function TripSearchInner({ tripId }) {
     )
   }, [selectedCategory])
 
+  const pageBg = 'linear-gradient(180deg, #E0F7FA 0%, #F0FDFA 45%, #F8FAFC 100%)'
+
   return (
-    <div
-      className="min-h-screen"
-      style={{ background: 'linear-gradient(180deg, #E0F7FA 0%, #F8FAFC 55%, #F1F5F9 100%)' }}
-    >
+    <div className="min-h-screen" style={{ background: pageBg }}>
       <TripFlowMobileBar backTo="/" />
 
-      <div className="mx-auto max-w-6xl px-4 py-8 md:py-12">
+      <div className="mx-auto max-w-6xl px-5 py-8 md:px-8 md:py-12">
         {/* 헤더 */}
         <div className="mb-8">
           <button
             type="button"
-            onClick={() => navigate('/')}
+            onClick={() => (mergeToArchive ? navigate(-1) : navigate('/'))}
             className="mb-3 hidden items-center gap-1 text-sm font-medium text-teal-700 hover:text-teal-900 md:flex"
           >
-            ← 내 여행으로
+            {mergeToArchive ? '← 이전으로' : '← 내 여행으로'}
           </button>
-          <h1 className="text-2xl md:text-3xl font-extrabold text-gray-900 leading-tight">
-            {TRIP_SEARCH_CONTEXT.title}
-          </h1>
-          {mergeToArchive ? (
-            <p className="mt-4 rounded-xl border border-teal-200 bg-teal-50/90 px-4 py-3 text-sm leading-relaxed text-teal-950">
-              <strong className="font-bold">이 체크리스트에 더 담기</strong> — 아래는 검색과 동일한 전체 결과입니다. 이미
-              이 목록에 들어 있는 항목은 선택할 수 없고, <strong>새로 고른 항목만</strong> 추가 시 목록에 반영됩니다.
+          <h1 className="text-2xl md:text-3xl font-extrabold text-gray-900 leading-tight">{pageMainTitle}</h1>
+          {mergeToArchive && archiveEntry ? (
+            <p className="mt-2 text-sm text-gray-600">
+              <span className="font-semibold text-gray-800">대상 체크리스트</span>
+              <span className="text-gray-500"> — </span>
+              {buildGuideArchiveListTitle(archiveEntry)}
             </p>
           ) : null}
           {archiveTargetMissing ? (
@@ -331,7 +334,7 @@ function TripSearchInner({ tripId }) {
 
         {/* 카테고리별 필수품 */}
         <section>
-          <h2 className="mb-4 text-lg font-extrabold text-gray-900">카테고리별 필수품</h2>
+          <h2 className="mb-4 text-lg font-extrabold text-gray-900">{sectionHeading}</h2>
 
           <div className="flex gap-2 mb-4 overflow-x-auto pb-1 scrollbar-thin">
             {CATEGORIES.map((cat) => {
@@ -339,11 +342,11 @@ function TripSearchInner({ tripId }) {
               const selected = selectedCategory === cat.value
               const tabClass = isAi
                 ? selected
-                  ? 'bg-violet-600 text-white shadow-md'
-                  : 'border border-violet-200 bg-violet-50 text-violet-900 hover:border-violet-400 hover:bg-violet-100'
+                  ? 'bg-amber-400 text-gray-900 shadow-md'
+                  : 'border-2 border-gray-100 bg-white/95 text-gray-800 shadow-sm hover:bg-cyan-50/80'
                 : selected
-                  ? 'bg-teal-700 text-white shadow-md'
-                  : 'border border-gray-200 bg-white text-gray-600 hover:border-teal-300'
+                  ? 'bg-amber-400 text-gray-900 shadow-md'
+                  : 'border-2 border-gray-100 bg-white/95 text-gray-600 shadow-sm hover:bg-cyan-50/80'
               return (
                 <button
                   key={cat.value}
@@ -359,12 +362,16 @@ function TripSearchInner({ tripId }) {
           </div>
 
           {/* 총 검색 결과 건수 — 카테고리 탭과 무관하게 전체 목록 기준 */}
-          <p className="mb-2 text-sm font-semibold text-gray-700 md:text-base">
-            총 검색 결과 : <span className="tabular-nums">{MOCK_ITEMS.length}</span>개
-          </p>
-          <p className="mb-5 text-sm text-gray-600">
-            체크리스트에 넣을 항목을 눌러 선택한 뒤, 하단{' '}
-            <strong className="text-gray-800">{mergeToArchive ? '추가' : '저장'}</strong>을 누르세요.
+          <p className="mb-5 text-sm font-semibold text-gray-700 md:text-base">
+            {mergeToArchive ? (
+              <>
+                추가 후보 <span className="tabular-nums">{MOCK_ITEMS.length}</span>개
+              </>
+            ) : (
+              <>
+                총 검색 결과 : <span className="tabular-nums">{MOCK_ITEMS.length}</span>개
+              </>
+            )}
           </p>
 
           {selectedCategory === 'all' ? (
@@ -375,7 +382,7 @@ function TripSearchInner({ tripId }) {
                     className={`mb-3 flex items-center gap-2 border-b pb-2 text-base font-extrabold ${
                       group.categoryValue === 'ai_recommend'
                         ? 'border-violet-200 text-violet-950'
-                        : 'border-teal-100 text-gray-900'
+                        : 'border-gray-200 text-gray-900'
                     }`}
                   >
                     {group.categoryValue === 'ai_recommend' ? (
@@ -418,25 +425,25 @@ function TripSearchInner({ tripId }) {
 
           {/* 저장 · 홈으로 */}
           <div className="mt-8 flex flex-col gap-3 border-t border-gray-200/80 pt-6">
-            <p className="text-xs text-gray-500 md:text-sm">
-              선택됨 <span className="font-bold tabular-nums text-teal-800">{selectedForSave.size}</span>개
+            <p className="text-xs text-slate-600 md:text-sm">
+              추가할 항목 <span className="font-bold tabular-nums text-slate-800">{selectedForSave.size}</span>개
             </p>
             <div className="flex flex-wrap gap-3">
-            <button
-              type="button"
-              onClick={openSaveConfirmModal}
-              disabled={selectedForSave.size === 0}
-              className="min-h-12 flex-1 rounded-2xl bg-teal-700 px-4 py-3.5 text-sm font-bold text-white shadow-md transition-colors hover:bg-teal-800 disabled:pointer-events-none disabled:opacity-40 sm:flex-none sm:min-w-[7.5rem] sm:px-8"
-            >
-              {mergeToArchive ? '추가' : '저장'}
-            </button>
-            <button
-              type="button"
-              onClick={openHomeConfirmModal}
-              className="min-h-12 flex-1 rounded-2xl border-2 border-gray-300 bg-white px-4 py-3.5 text-sm font-bold text-gray-800 transition-colors hover:bg-gray-50 sm:flex-none sm:min-w-[7.5rem] sm:px-8"
-            >
-              {mergeToArchive ? '뒤로 가기' : '홈으로'}
-            </button>
+              <button
+                type="button"
+                onClick={openSaveConfirmModal}
+                disabled={selectedForSave.size === 0}
+                className="min-h-12 flex-1 rounded-2xl bg-amber-400 px-4 py-3.5 text-sm font-bold text-gray-900 shadow-sm transition-all hover:bg-amber-500 hover:shadow-md disabled:pointer-events-none disabled:opacity-40 sm:flex-none sm:min-w-[7.5rem] sm:px-8"
+              >
+                {mergeToArchive ? '추가' : '저장'}
+              </button>
+              <button
+                type="button"
+                onClick={openHomeConfirmModal}
+                className="min-h-12 flex-1 rounded-2xl border-2 border-gray-100 bg-white/95 px-4 py-3.5 text-sm font-bold text-gray-800 shadow-sm transition-colors hover:bg-cyan-50/80 sm:flex-none sm:min-w-[7.5rem] sm:px-8"
+              >
+                {mergeToArchive ? '뒤로 가기' : '홈으로'}
+              </button>
             </div>
           </div>
         </section>
@@ -445,7 +452,7 @@ function TripSearchInner({ tripId }) {
       {/* 저장 확인 → 가이드 보관함 이동 */}
       {saveConfirmModalOpen && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/45"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-teal-950/40 p-4 backdrop-blur-[2px]"
           role="presentation"
           onClick={closeSaveConfirmModal}
         >
@@ -453,29 +460,29 @@ function TripSearchInner({ tripId }) {
             role="dialog"
             aria-modal="true"
             aria-labelledby="save-checklist-modal-title"
-            className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
+            className="relative w-full max-w-md rounded-2xl border border-teal-100/90 bg-white p-6 shadow-2xl shadow-teal-900/15 ring-1 ring-teal-50"
             onClick={(e) => e.stopPropagation()}
           >
-            <p
+            <h2
               id="save-checklist-modal-title"
-              className="text-center text-sm font-semibold text-gray-900 leading-relaxed mb-8"
+              className="text-center text-sm font-extrabold leading-relaxed text-gray-900 md:text-base md:leading-snug"
             >
               {mergeToArchive
                 ? '선택한 항목을 이 체크리스트에 추가합니다. 확인 시 해당 체크리스트 화면으로 돌아갑니다.'
                 : '정말 저장하시겠습니까? 확인 시 가이드 보관함으로 이동하며, 되돌릴 수 없습니다.'}
-            </p>
-            <div className="flex flex-col gap-3 sm:flex-row sm:gap-3">
+            </h2>
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <button
                 type="button"
                 onClick={handleConfirmSaveAndGoArchive}
-                className="min-h-12 flex-1 rounded-xl bg-teal-700 py-3 text-sm font-bold text-white transition-colors hover:bg-teal-800"
+                className="min-h-12 flex-1 rounded-2xl border-2 border-amber-300 bg-amber-50 py-3 text-sm font-bold text-amber-950 shadow-sm transition-colors hover:border-amber-400 hover:bg-amber-100"
               >
                 확인
               </button>
               <button
                 type="button"
                 onClick={closeSaveConfirmModal}
-                className="min-h-12 flex-1 rounded-xl border-2 border-teal-600 bg-white py-3 text-sm font-bold text-teal-800 transition-colors hover:bg-teal-50"
+                className="min-h-12 flex-1 rounded-2xl border-2 border-teal-600 bg-white py-3 text-sm font-bold text-teal-800 shadow-sm transition-colors hover:bg-teal-50"
               >
                 취소
               </button>
@@ -487,7 +494,7 @@ function TripSearchInner({ tripId }) {
       {/* 홈 이동 확인 모달 */}
       {leaveModalOpen && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/45"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-teal-950/40 p-4 backdrop-blur-[2px]"
           role="presentation"
           onClick={handleModalBack}
         >
@@ -495,26 +502,26 @@ function TripSearchInner({ tripId }) {
             role="dialog"
             aria-modal="true"
             aria-labelledby="leave-modal-title"
-            className="relative w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl"
+            className="relative w-full max-w-sm rounded-2xl border border-teal-100/90 bg-white p-6 shadow-2xl shadow-teal-900/15 ring-1 ring-teal-50"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 id="leave-modal-title" className="text-center text-base font-bold text-gray-900 leading-snug mb-8">
+            <h2 id="leave-modal-title" className="text-center text-base font-extrabold leading-snug text-gray-900">
               저장하지 않으시겠습니까?
             </h2>
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={handleModalBack}
-                className="flex-1 rounded-xl border-2 border-teal-600 bg-white py-3 text-sm font-bold text-teal-800 hover:bg-teal-50 transition-colors"
-              >
-                뒤로 가기
-              </button>
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
               <button
                 type="button"
                 onClick={handleLeaveWithoutSave}
-                className="flex-1 rounded-xl bg-gray-200 hover:bg-gray-300 py-3 text-sm font-bold text-gray-800 transition-colors"
+                className="min-h-12 flex-1 rounded-2xl border-2 border-amber-300 bg-amber-50 py-3 text-sm font-bold text-amber-950 shadow-sm transition-colors hover:border-amber-400 hover:bg-amber-100"
               >
                 저장안함
+              </button>
+              <button
+                type="button"
+                onClick={handleModalBack}
+                className="min-h-12 flex-1 rounded-2xl border-2 border-teal-600 bg-white py-3 text-sm font-bold text-teal-800 shadow-sm transition-colors hover:bg-teal-50"
+              >
+                뒤로 가기
               </button>
             </div>
           </div>
@@ -530,16 +537,16 @@ function SearchResultItem({ item, selected, onToggle, inArchiveAlready = false, 
   if (inArchiveAlready) {
     return (
       <div
-        className={`w-full rounded-xl border border-teal-100 bg-teal-50/50 p-4 text-left ${className}`.trim()}
+        className={`w-full rounded-2xl border-2 border-gray-200 bg-cyan-50/40 p-4 text-left shadow-sm ${className}`.trim()}
         role="group"
         aria-label="이미 이 체크리스트에 담긴 항목"
       >
         <div className="flex gap-3">
           <span
-            className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 border-teal-300 bg-teal-100"
+            className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 border-amber-300 bg-amber-100"
             aria-hidden
           >
-            <svg className="h-3 w-3 text-teal-700" viewBox="0 0 12 12" fill="none" aria-hidden>
+            <svg className="h-3 w-3 text-amber-800" viewBox="0 0 12 12" fill="none" aria-hidden>
               <path
                 d="M2.5 6.2 5 8.7 9.5 3.3"
                 stroke="currentColor"
@@ -551,13 +558,13 @@ function SearchResultItem({ item, selected, onToggle, inArchiveAlready = false, 
           </span>
           <div className="min-w-0 flex-1">
             <p className="flex flex-wrap items-center gap-2">
-              <span className="text-[15px] font-bold leading-snug text-teal-950">{item.title}</span>
-              <span className="rounded-full bg-teal-200/80 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-teal-900">
+              <span className="text-[15px] font-extrabold leading-snug text-gray-900">{item.title}</span>
+              <span className="rounded-full bg-amber-200/90 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-950">
                 담김
               </span>
             </p>
             {subtitleText ? (
-              <p className="mt-1.5 text-sm leading-relaxed text-teal-900/70">{subtitleText}</p>
+              <p className="mt-1.5 text-sm leading-relaxed text-gray-600">{subtitleText}</p>
             ) : null}
           </div>
         </div>
@@ -565,20 +572,17 @@ function SearchResultItem({ item, selected, onToggle, inArchiveAlready = false, 
     )
   }
 
+  const btnShell = selected
+    ? 'w-full cursor-pointer rounded-2xl border-2 border-amber-400 bg-amber-200/95 p-4 text-left shadow-sm ring-1 ring-amber-300/70 transition-all duration-200'
+    : 'w-full cursor-pointer rounded-2xl border-2 border-gray-100 bg-white/95 p-4 text-left shadow-sm transition-all duration-200 hover:bg-cyan-50/80'
+
+  const checkShell = selected ? 'border-amber-600 bg-amber-600' : 'border-gray-300 bg-white'
+
   return (
-    <button
-      type="button"
-      onClick={onToggle}
-      aria-pressed={selected}
-      className={`w-full cursor-pointer rounded-xl border bg-white p-4 text-left transition-colors hover:bg-gray-50/80 ${
-        selected ? 'border-teal-500 ring-1 ring-teal-200' : 'border-gray-200'
-      } ${className}`.trim()}
-    >
+    <button type="button" onClick={onToggle} aria-pressed={selected} className={`${btnShell} ${className}`.trim()}>
       <div className="flex gap-3">
         <span
-          className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-colors ${
-            selected ? 'border-teal-600 bg-teal-600' : 'border-gray-300 bg-white'
-          }`}
+          className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 transition-colors ${checkShell}`}
           aria-hidden
         >
           {selected ? (
@@ -594,9 +598,9 @@ function SearchResultItem({ item, selected, onToggle, inArchiveAlready = false, 
           ) : null}
         </span>
         <div className="min-w-0 flex-1">
-          <p className="text-[15px] font-bold leading-snug text-gray-900">{item.title}</p>
+          <p className="text-[15px] font-extrabold leading-snug text-gray-900">{item.title}</p>
           {subtitleText ? (
-            <p className="mt-1.5 text-sm leading-relaxed text-gray-500">{subtitleText}</p>
+            <p className="mt-1.5 text-sm leading-relaxed text-gray-600">{subtitleText}</p>
           ) : null}
         </div>
       </div>

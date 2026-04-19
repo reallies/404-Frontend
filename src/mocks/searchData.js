@@ -21,7 +21,7 @@ export const CATEGORIES = [
 
 /** 상단 요약: 목적지 날씨·환경 컨텍스트 */
 export const TRIP_SEARCH_CONTEXT = {
-  title: '맞춤 여행 준비 리스트',
+  title: '맞춤 여행 체크리스트',
   destination: '다낭 · 호이안 · 바나힐 일대',
   country: '베트남',
   tripWindowLabel: '5월 18일 ~ 5월 24일 (예시)',
