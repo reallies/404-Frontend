@@ -17,7 +17,6 @@ import {
 } from '@/utils/guideArchiveEntryChecklistStorage'
 import {
   BAGGAGE_CARRY_ON,
-  BAGGAGE_CHECKED,
   BAGGAGE_SECTION_LABEL,
   BAGGAGE_SECTION_ORDER,
   GUIDE_USER_DIRECT_CATEGORY,
@@ -31,7 +30,7 @@ import {
  * 화면에서의 체크/해제는 메모리만 바꾸고, **저장 → 확인**을 눌렀을 때만 스토리지에 반영합니다(뒤로가기 시 폐기).
  * 준비물 **삭제**(선택 삭제)는 스토리지에 즉시 반영됩니다. 보관함에서 빠진 항목 id는 탐색 저장(`savedTripItems`)에서도 제거합니다.
  * **선택메뉴**로 관리 모드 진입 후, 같은 카테고리(섹션) 항목을 체크하고 「수정」을 누르면 **선택한 항목만** 편집 모달에 표시·저장됩니다.
- * **직접 추가**: 선택메뉴에서 항목을 저장하면 본문 **맨 아래**에 「기내 반입」「위탁 수하물」과 **동일한 제목 스타일**의 `직접 추가` 블록으로 모읍니다(상단 필터에 맞게 표시).
+ * **직접 추가**: 선택메뉴에서 항목을 저장하면 **기내 반입**으로 분류되어 본문 **맨 아래** `직접 추가` 블록에 붙습니다(상단 필터 반영).
  * `onArchiveMutated`: 삭제·섹션 저장 후 부모가 스토리지에서 entry를 다시 읽을 때 호출합니다.
  */
 export default function GuideArchiveChecklistView({ tripId, entry, onArchiveMutated }) {
@@ -46,7 +45,6 @@ export default function GuideArchiveChecklistView({ tripId, entry, onArchiveMuta
     title: '',
     description: '',
     detail: '',
-    baggageType: BAGGAGE_CARRY_ON,
   })
   const [selectedItemIdsForDelete, setSelectedItemIdsForDelete] = useState([])
   /** 'all' | carry_on | checked — 상단 「카테고리별 선택」에서 수하물 구간만 고름 */
@@ -74,7 +72,6 @@ export default function GuideArchiveChecklistView({ tripId, entry, onArchiveMuta
       title: '',
       description: '',
       detail: '',
-      baggageType: BAGGAGE_CARRY_ON,
     })
     setSelectedItemIdsForDelete([])
   }, [])
@@ -181,7 +178,6 @@ export default function GuideArchiveChecklistView({ tripId, entry, onArchiveMuta
       title: '',
       description: '',
       detail: '',
-      baggageType: BAGGAGE_CARRY_ON,
     })
     setSelectedItemIdsForDelete([])
   }, [])
@@ -191,7 +187,6 @@ export default function GuideArchiveChecklistView({ tripId, entry, onArchiveMuta
       title: '',
       description: '',
       detail: '',
-      baggageType: BAGGAGE_CARRY_ON,
     })
     setDirectAddModalOpen(true)
   }, [])
@@ -202,7 +197,6 @@ export default function GuideArchiveChecklistView({ tripId, entry, onArchiveMuta
       title: '',
       description: '',
       detail: '',
-      baggageType: BAGGAGE_CARRY_ON,
     })
   }, [])
 
@@ -214,7 +208,6 @@ export default function GuideArchiveChecklistView({ tripId, entry, onArchiveMuta
     }
     const description = (directAddDraft.description ?? '').trim()
     const detail = (directAddDraft.detail ?? '').trim()
-    const baggageType = directAddDraft.baggageType === BAGGAGE_CHECKED ? BAGGAGE_CHECKED : BAGGAGE_CARRY_ON
     const id = `ga-direct-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
     const newItem = {
       id,
@@ -223,7 +216,7 @@ export default function GuideArchiveChecklistView({ tripId, entry, onArchiveMuta
       title,
       description,
       detail,
-      baggageType,
+      baggageType: BAGGAGE_CARRY_ON,
     }
     const newItems = [...items, newItem]
     const idStr = String(id)
@@ -251,7 +244,6 @@ export default function GuideArchiveChecklistView({ tripId, entry, onArchiveMuta
       title: '',
       description: '',
       detail: '',
-      baggageType: BAGGAGE_CARRY_ON,
     })
     onArchiveMutated?.()
   }, [directAddDraft, items, checks, tripId, entry.id, onArchiveMutated])
@@ -919,37 +911,10 @@ export default function GuideArchiveChecklistView({ tripId, entry, onArchiveMuta
               직접 추가
             </h2>
             <p className="mb-4 text-sm text-gray-600">
-              제목은 필수입니다. 저장하면 체크리스트 본문 맨 아래에 「{GUIDE_USER_DIRECT_SECTION_LABEL}」 제목(기내·위탁 구역 제목과 같은 스타일)으로 모입니다.
+              제목은 필수입니다. 항목은 <strong className="font-semibold text-gray-800">기내 반입</strong>으로
+              저장되며, 체크리스트 본문 맨 아래 「{GUIDE_USER_DIRECT_SECTION_LABEL}」 블록(구역 제목과 같은 스타일)에
+              붙습니다.
             </p>
-            <fieldset className="mb-4">
-              <legend className="mb-2 block text-xs font-bold text-gray-600">수하물 구간</legend>
-              <div className="flex flex-wrap gap-3">
-                <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-gray-800">
-                  <input
-                    type="radio"
-                    name="direct-add-baggage"
-                    checked={directAddDraft.baggageType === BAGGAGE_CARRY_ON}
-                    onChange={() =>
-                      setDirectAddDraft((d) => ({ ...d, baggageType: BAGGAGE_CARRY_ON }))
-                    }
-                    className="h-4 w-4 accent-sky-600"
-                  />
-                  {BAGGAGE_SECTION_LABEL[BAGGAGE_CARRY_ON]}
-                </label>
-                <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-semibold text-gray-800">
-                  <input
-                    type="radio"
-                    name="direct-add-baggage"
-                    checked={directAddDraft.baggageType === BAGGAGE_CHECKED}
-                    onChange={() =>
-                      setDirectAddDraft((d) => ({ ...d, baggageType: BAGGAGE_CHECKED }))
-                    }
-                    className="h-4 w-4 accent-sky-600"
-                  />
-                  {BAGGAGE_SECTION_LABEL[BAGGAGE_CHECKED]}
-                </label>
-              </div>
-            </fieldset>
             <label className="mb-3 block">
               <span className="mb-1 block text-xs font-semibold text-gray-600">제목 (필수)</span>
               <input
