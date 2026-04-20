@@ -4,6 +4,7 @@ import { IMAGES } from '@/images/constants'
 import { FEATURE_CARDS, FOOTER_SECTIONS, FOOTER_BOTTOM_LINKS } from '@/mocks/homeData'
 import BrandLogo from '@/components/common/BrandLogo'
 import { AUTH_CONSENT_PATH, AUTH_CONSENT_PREVIEW_PARAM } from '@/utils/onboardingGate'
+import homeMobileHeroTravel from '@/assets/home-mobile-hero-travel.png'
 
 const SLIDE_INTERVAL = 5000
 const HERO_SLIDES = IMAGES.home.heroSlides
@@ -47,17 +48,28 @@ function HomePage() {
   const [currentSlide, setCurrentSlide] = useState(0)
 
   useEffect(() => {
-    const timer = setInterval(() => {
+    const mq = window.matchMedia('(min-width: 768px)')
+    let timer
+    const tick = () => {
       setCurrentSlide((prev) => (prev + 1) % HERO_SLIDES.length)
-    }, SLIDE_INTERVAL)
-    return () => clearInterval(timer)
+    }
+    const sync = () => {
+      clearInterval(timer)
+      if (mq.matches) timer = setInterval(tick, SLIDE_INTERVAL)
+    }
+    sync()
+    mq.addEventListener('change', sync)
+    return () => {
+      mq.removeEventListener('change', sync)
+      clearInterval(timer)
+    }
   }, [])
 
   return (
     <div className="bg-white">
       {/* 히어로 — 웹과 동일 카피·구조, 모바일은 세로 스택 */}
       <section
-        className="relative overflow-hidden pb-10 md:min-h-[520px] md:pb-0"
+        className="relative overflow-hidden pb-0 md:min-h-[520px] md:pb-0"
         style={{
           background: 'linear-gradient(135deg, #ECFDF5 0%, #E0F2FE 30%, #EDE9FE 65%, #FDF2F8 100%)',
         }}
@@ -137,10 +149,16 @@ function HomePage() {
           </div>
         </div>
 
-        {/* 모바일: 히어로 이미지 슬라이드 (텍스트 아래) */}
-        <div className="relative z-[1] mt-8 px-5 md:hidden">
-          <div className="relative mx-auto aspect-[16/10] max-h-64 w-full max-w-3xl overflow-hidden rounded-2xl shadow-lg ring-1 ring-black/5">
-            <HeroSlideshow currentSlide={currentSlide} />
+        {/* 모바일: 히어로 단일 이미지 — 하단만 라운드. 뒤에 직사각 흰 판을 두어 border-radius 바깥 삼각형에 그라데이션이 비치지 않게 함 */}
+        <div className="relative z-[1] mt-8 h-64 w-full md:hidden">
+          <div className="absolute inset-0 bg-white" aria-hidden />
+          <div className="absolute inset-0 overflow-hidden rounded-b-2xl">
+            <img
+              src={homeMobileHeroTravel}
+              alt="비행기 창밖으로 보이는 구름 위의 여행 풍경"
+              className="absolute left-1/2 top-1/2 h-[106%] w-[106%] max-w-none -translate-x-1/2 -translate-y-1/2 object-cover object-[58%_36%]"
+              loading="eager"
+            />
           </div>
         </div>
 

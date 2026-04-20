@@ -9,6 +9,12 @@
  * (실서비스에서는 백엔드의 `onboarding_completed` / `profile_completed` 등으로 같은 의미를 쓰면 됩니다.)
  * 온보딩을 **중간에만** 하고 나간 계정은 다음 로그인 시 **남은 단계(온보딩)** 로 이어집니다.
  *
+ * ## 로그아웃 후 재로그인 (실서비스와 동일한 의도)
+ * - 로그아웃 UI는 `/login`(소셜 로그인 페이지)으로 보냅니다.
+ * - `clearClientSessionForLogout()`은 **세션만** 지우고, `localStorage`의 동의·온보딩 완료·프로바이더별 mock `sub`는 **유지**합니다.
+ * - 따라서 이미 한 번 전체 플로우를 마친 사용자가 **같은 소셜 버튼**으로 다시 로그인하면 `resolvePostSocialLoginPath`가 `hasCompletedOnboarding(sub)`로 곧바로 `/`를 반환합니다.
+ * - 실연동 시: 로그아웃은 토큰/세션만 무효화하고, 재로그인 OAuth 완료 후 서버가 `onboarding_completed` 등을 내려주면 동일하게 홈으로 보내면 됩니다.
+ *
  * 백엔드 연동 후:
  * - OAuth 콜백에서 `user.sub`(또는 id)와 서버 플래그만 보고 `navigate(...)` 분기하면 되고,
  * - 이 모듈의 localStorage/sessionStorage 키는 제거해도 됩니다.
@@ -19,6 +25,37 @@ const KEY_ONBOARDED = `${NS}:onboarded_account_ids`
 const KEY_LEGAL_CONSENT = `${NS}:legal_consent_account_ids`
 const mockSubKey = (provider) => `${NS}:mock_oauth_sub:${String(provider).toLowerCase()}`
 export const SESSION_LAST_SOCIAL_PROVIDER = `${NS}:last_social_provider`
+
+/**
+ * 로그아웃 시 클라이언트 **세션만** 정리합니다.
+ *
+ * - 제거: `sessionStorage`의 마지막 소셜 프로바이더(모의 로그인 직후 분기용).
+ * - 유지: `localStorage`의 약관 동의·온보딩 완료 집합, 프로바이더별 mock OAuth `sub`.
+ *   → 같은 기기에서 재로그인 시 약관/프로필 단계를 건너뛰고 홈으로 가는 동작의 전제입니다.
+ *
+ * 실연동 시: refresh/access 토큰 삭제·`signOut`·쿠키 무효화 등을 여기(또는 호출부)에 추가하고,
+ * **계정 단위 플래그는 서버가 권위**를 가지므로 클라이언트에서 임의로 지우지 않습니다.
+ */
+export function clearClientSessionForLogout() {
+  if (typeof window === 'undefined') return
+  try {
+    sessionStorage.removeItem(SESSION_LAST_SOCIAL_PROVIDER)
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * 데스크톱 헤더 등 — 「웹에서 로그인된 UI를 쓸지」 모의 판별.
+ * 소셜 로그인 플로우에서 `resolvePostSocialLoginPath`가 세팅한 sessionStorage만 본다.
+ * 실연동 시: Auth 세션·액세스 토큰·`/me` 응답 등으로 교체하면 됨.
+ *
+ * @returns {boolean}
+ */
+export function isMockWebSessionLoggedIn() {
+  if (typeof window === 'undefined') return false
+  return Boolean(sessionStorage.getItem(SESSION_LAST_SOCIAL_PROVIDER))
+}
 
 /** 약관·개인정보 동의 화면 경로 */
 export const AUTH_CONSENT_PATH = '/auth/consent'
