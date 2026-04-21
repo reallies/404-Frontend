@@ -5,10 +5,8 @@ import { getSupabaseClient } from '@/lib/supabase'
  * 백엔드 API 호출용 axios 인스턴스.
  *
  * 토큰 우선순위:
- *   1. Supabase 세션 (`getSession`) — Google/Kakao 로그인
- *   2. localStorage `checkmate:auth_token` — Naver (백엔드 중개) 로그인
- *
- * 이 구조 덕분에 프로바이더에 관계없이 동일하게 `client.get('/trips', ...)` 사용 가능.
+ *   1. Supabase 세션 (`getSession`) — Google/Kakao 로그인 (기본 경로)
+ *   2. localStorage `checkmate:auth_token` — 폴백 (명시적으로 토큰을 저장한 경우)
  */
 
 export const AUTH_TOKEN_STORAGE_KEY = 'checkmate:auth_token'

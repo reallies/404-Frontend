@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import loginCheckmateBrandUrl from '@/assets/login-checkmate-brand.png'
 import { resolvePostSocialLoginPath } from '@/utils/onboardingGate'
-import { startGoogleLogin, startKakaoLogin, startNaverLogin } from '@/api/auth'
+import { startGoogleLogin, startKakaoLogin } from '@/api/auth'
 import { isSupabaseConfigured } from '@/lib/supabase'
 
 /**
@@ -54,18 +54,6 @@ function LoginPage() {
     async (provider) => {
       if (socialPending) return
       setSocialError('')
-
-      // Naver 는 env 없이도 백엔드 중개 경로로 이동 가능 (백엔드에서 자체 실패 페이지 처리).
-      if (provider === 'naver') {
-        setSocialPending(provider)
-        try {
-          startNaverLogin()
-        } catch (err) {
-          setSocialError(err?.message || '네이버 로그인을 시작하지 못했습니다.')
-          setSocialPending('')
-        }
-        return
-      }
 
       // Google/Kakao: Supabase 필요. 미설정이면 기존 플레이스홀더 동작(이동)으로 폴백.
       if (!isSupabaseConfigured()) {
@@ -323,20 +311,6 @@ function LoginPage() {
                   <path d="M12 3c5.523 0 10 3.582 10 8s-4.477 8-10 8c-.555 0-1.1-.036-1.633-.105L5.5 21.5l.825-3.96C3.93 16.32 2 13.86 2 11c0-4.418 4.477-8 10-8z" />
                 </svg>
                 Kakao로 시작하기
-              </button>
-              <button
-                type="button"
-                disabled={Boolean(socialPending)}
-                className="flex w-full items-center justify-center gap-3 rounded-full bg-[#03C75A] py-4 text-base font-bold text-white shadow-sm transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
-                onClick={() => handleSocialLogin('naver')}
-              >
-                <span
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-white text-base font-black text-[#03C75A]"
-                  aria-hidden="true"
-                >
-                  N
-                </span>
-                Naver로 시작하기
               </button>
             </div>
 

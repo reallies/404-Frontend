@@ -156,7 +156,7 @@ export function markLegalConsentAccepted(accountSubject, options = {}) {
  * 소셜 로그인 성공 직후(플레이스홀더 클릭) 이동 경로.
  * 순서: 약관 미동의 → 동의 화면 / 약관 완료 + 온보딩 플래그 on + 프로필 미완 → 온보딩 / 그 외 → 홈
  *
- * @param {'google'|'kakao'|'naver'} provider
+ * @param {'google'|'kakao'} provider
  * @returns {'/'|'/auth/consent'|'/onboarding'}
  */
 export function resolvePostSocialLoginPath(provider) {
