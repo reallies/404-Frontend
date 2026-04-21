@@ -10,16 +10,11 @@ import {
  *
  * 설계 원칙:
  * - Google/Kakao 는 Supabase Auth 가 처리(`supabase.auth.signInWithOAuth`).
- * - Naver 는 Supabase 가 네이티브 지원하지 않아 **백엔드 `/auth/naver/login` 중개 경로** 로 이동.
- * - 콜백 처리(`consumeAuthCallback`)는 두 경로 모두 `/auth/callback` 한 곳에서 통합.
+ * - 콜백 처리(`consumeAuthCallback`)는 `/auth/callback` 에서 Supabase 세션을 확정.
  */
 
 const FRONT_ORIGIN = typeof window !== 'undefined' ? window.location.origin : ''
 const DEFAULT_CALLBACK = `${FRONT_ORIGIN}/auth/callback`
-
-const NAVER_LOGIN_URL =
-  import.meta.env.VITE_AUTH_NAVER_LOGIN_URL ||
-  `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api'}/auth/naver/login`
 
 // ------------------------------------------------------------------
 // 로그인 진입
@@ -35,15 +30,10 @@ export async function startKakaoLogin(opts = {}) {
   await startSupabaseOAuth('kakao', opts)
 }
 
-/** 네이버는 페이지 전체 리다이렉트로 백엔드 중개 경로 진입. */
-export function startNaverLogin() {
-  window.location.href = NAVER_LOGIN_URL
-}
-
 async function startSupabaseOAuth(provider, opts) {
   if (!isSupabaseConfigured()) {
     throw new Error(
-      'Supabase 환경변수 미설정: VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY 를 .env.local 에 채워 주세요.',
+      'Supabase 환경변수 미설정: VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY 를 .env 에 채워 주세요.',
     )
   }
   const supabase = getSupabaseClient()
@@ -57,15 +47,14 @@ async function startSupabaseOAuth(provider, opts) {
 }
 
 // ------------------------------------------------------------------
-// /auth/callback 에서 호출 — URL 해시 파싱 + 세션 확정
+// /auth/callback 에서 호출 — Supabase 세션 확정
 // ------------------------------------------------------------------
 
 /**
  * /auth/callback 에서 호출:
- * - Supabase 경로(`detectSessionInUrl: true`) 는 세션이 자동 생성되므로 `getSession()` 만 읽으면 됨.
- * - Naver 경로는 URL fragment 에 `access_token=...` 이 수동 첨부되어 있음 → 파싱해 localStorage 에 저장.
+ * - Supabase 클라이언트는 `detectSessionInUrl: true` 로 세션을 자동 생성하므로 `getSession()` 만 읽으면 된다.
  *
- * @returns {Promise<{ ok: true, provider: 'google'|'kakao'|'naver', sub: string } | { ok: false, error: string }>}
+ * @returns {Promise<{ ok: true, provider: 'google'|'kakao', sub: string } | { ok: false, error: string }>}
  */
 export async function consumeAuthCallback() {
   const hashParams = parseHashParams(
@@ -76,19 +65,6 @@ export async function consumeAuthCallback() {
     return { ok: false, error: hashParams.error }
   }
 
-  // Naver (우리 백엔드 중개) — hash 에 provider=naver 와 access_token 이 함께 옴.
-  if (hashParams.provider === 'naver' && hashParams.access_token) {
-    try {
-      localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, hashParams.access_token)
-      localStorage.setItem(AUTH_PROVIDER_STORAGE_KEY, 'naver')
-    } catch {
-      return { ok: false, error: 'storage_unavailable' }
-    }
-    const sub = decodeJwtSub(hashParams.access_token)
-    return { ok: true, provider: 'naver', sub: sub ?? '' }
-  }
-
-  // Google / Kakao — Supabase 가 URL 을 파싱했을 수도 있음. getSession() 으로 확인.
   const supabase = getSupabaseClient()
   if (supabase) {
     const { data } = await supabase.auth.getSession()
@@ -148,16 +124,4 @@ function parseHashParams(hash) {
   const out = {}
   for (const [k, v] of params.entries()) out[k] = v
   return out
-}
-
-function decodeJwtSub(token) {
-  try {
-    const payload = token.split('.')[1]
-    const b64 = payload.replace(/-/g, '+').replace(/_/g, '/')
-    const json = atob(b64)
-    const obj = JSON.parse(json)
-    return typeof obj.sub === 'string' ? obj.sub : null
-  } catch {
-    return null
-  }
 }

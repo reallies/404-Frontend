@@ -10,10 +10,10 @@ import {
 } from '@/utils/onboardingGate'
 
 /**
- * /auth/callback — Google/Kakao (Supabase) 와 Naver (백엔드 중개) 로그인을 한 화면에서 처리.
+ * /auth/callback — Google/Kakao 소셜 로그인(Supabase Auth) 콜백 처리.
  *
  * 흐름:
- *   1. URL hash 또는 Supabase 세션에서 access_token + provider + sub 추출 (`consumeAuthCallback`).
+ *   1. Supabase 세션에서 access_token + provider + sub 추출 (`consumeAuthCallback`).
  *   2. sub 를 `onboardingGate` 의 mock sub 위치(localStorage) 에 덮어씀 →
  *      기존 게이트 유틸(`hasCompletedOnboarding`, `hasAcceptedLegalConsent`)이 **그대로** 실 사용자용으로 작동.
  *   3. 기존/신규 사용자 분기: 온보딩 완료 → /, 약관 미동의 → /auth/consent, 약관만 OK → /onboarding.
@@ -121,8 +121,6 @@ function mapCallbackError(code) {
       return '인증 요청이 만료되었거나 일치하지 않습니다. 다시 시도해 주세요.'
     case 'storage_unavailable':
       return '브라우저 저장소에 접근할 수 없어 로그인 상태를 유지할 수 없습니다.'
-    case 'naver_login_failed':
-      return '네이버 로그인에 실패했습니다. 잠시 후 다시 시도해 주세요.'
     default:
       return code ? `오류: ${code}` : '알 수 없는 오류가 발생했습니다.'
   }
