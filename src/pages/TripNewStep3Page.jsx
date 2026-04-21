@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import {
   STEP3_CONFIG,
   STEP3_ICON_PATHS,
@@ -10,7 +10,10 @@ import {
 } from '@/mocks/tripNewStep3Data'
 import { fetchFlightInfo } from '@/mocks/flightMockData'
 import StepHeader from '@/components/common/StepHeader'
-import { TripFlowDesktopBar } from '@/components/common/TripFlowTopBar'
+import {
+  TripNewFlowDesktopPrevBar,
+  TripNewFlowMobilePrevAction,
+} from '@/components/trip/TripNewFlowPrevControls'
 import AiConciergeTip from '@/components/common/AiConciergeTip'
 import TripStepDesktopSplit from '@/components/trip/TripStepDesktopSplit'
 import { TripFlowNextStepButton } from '@/components/trip/TripFlowNextStepButton'
@@ -317,7 +320,7 @@ function TripNewStep3Page() {
         fullBleed={<FullBleedMintImageHero src={HERO_IMAGE} alt="비행기 창문" />}
         left={
           <>
-            <TripFlowDesktopBar backTo="/trips/new/step2" className="mb-6" />
+            <TripNewFlowDesktopPrevBar className="mb-6" />
 
             <StepHeader
               currentStep={STEP3_CONFIG.currentStep}
@@ -371,13 +374,6 @@ function TripNewStep3Page() {
       ══════════════════════════════════ */}
       <div className="md:hidden">
         <div className="px-5 pt-4 pb-44">
-          <Link
-            to="/trips/new/step2"
-            className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-teal-700 hover:text-teal-900"
-          >
-            ← 이전 단계
-          </Link>
-
           <StepHeader
             currentStep={STEP3_CONFIG.currentStep}
             totalSteps={STEP3_CONFIG.totalSteps}
@@ -386,6 +382,7 @@ function TripNewStep3Page() {
             className="mb-6"
             titleClassName="text-2xl"
             subtitleClassName="text-sm"
+            topEndAction={<TripNewFlowMobilePrevAction />}
           />
 
           {/* 항공편 입력 카드 목록 */}

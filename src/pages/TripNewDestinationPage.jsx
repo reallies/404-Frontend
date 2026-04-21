@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import {
   STEP_DESTINATION_CONFIG,
   COUNTRY_ARRIVAL_OPTIONS,
@@ -17,7 +17,10 @@ import AiConciergeTip from '@/components/common/AiConciergeTip'
 import TripStepDesktopSplit from '@/components/trip/TripStepDesktopSplit'
 import { TripFlowNextStepButton } from '@/components/trip/TripFlowNextStepButton'
 import { FullBleedMintImageHero } from '@/components/trip/MintProgressiveHero'
-import { TripFlowDesktopBar } from '@/components/common/TripFlowTopBar'
+import {
+  TripNewFlowDesktopPrevBar,
+  TripNewFlowMobilePrevAction,
+} from '@/components/trip/TripNewFlowPrevControls'
 import DestinationMobileRangeCalendar from '@/components/trip/DestinationMobileRangeCalendar'
 import DestinationCountryAutocomplete from '@/components/trip/DestinationCountryAutocomplete'
 import SelectedCountryChip from '@/components/trip/SelectedCountryChip'
@@ -423,7 +426,7 @@ export default function TripNewDestinationPage() {
         fullBleed={<FullBleedMintImageHero src={HERO_IMAGE} alt="여행 목적지 풍경" />}
         left={
           <>
-            <TripFlowDesktopBar backTo="/trips/new/step2" className="mb-4" />
+            <TripNewFlowDesktopPrevBar className="mb-4" />
 
             <StepHeader
               currentStep={STEP_DESTINATION_CONFIG.currentStep}
@@ -457,12 +460,6 @@ export default function TripNewDestinationPage() {
 
       <div className="md:hidden">
         <div className="px-5 pt-4 pb-56">
-          <Link
-            to="/trips/new/step2"
-            className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-teal-700 hover:text-teal-900"
-          >
-            ← 이전 단계
-          </Link>
           <StepHeader
             currentStep={STEP_DESTINATION_CONFIG.currentStep}
             totalSteps={STEP_DESTINATION_CONFIG.totalSteps}
@@ -475,6 +472,7 @@ export default function TripNewDestinationPage() {
             }
             className="mb-4"
             titleClassName="text-2xl"
+            topEndAction={<TripNewFlowMobilePrevAction />}
           />
 
           <div className="mb-8 rounded-2xl border border-sky-100/90 bg-sky-50/95 p-4 shadow-sm">

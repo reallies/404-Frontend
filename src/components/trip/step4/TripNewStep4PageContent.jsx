@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate, useLocation, Link } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import {
   STEP4_CONFIG,
   HERO_IMAGE,
@@ -10,7 +10,10 @@ import {
 import { loadStep4NavigationState } from '@/utils/tripFlowDraftStorage'
 import { arrayMove } from '@/utils/tripStep4Helpers'
 import StepHeader from '@/components/common/StepHeader'
-import { TripFlowDesktopBar } from '@/components/common/TripFlowTopBar'
+import {
+  TripNewFlowDesktopPrevBar,
+  TripNewFlowMobilePrevAction,
+} from '@/components/trip/TripNewFlowPrevControls'
 import AiConciergeTip from '@/components/common/AiConciergeTip'
 import TripStepDesktopSplit from '@/components/trip/TripStepDesktopSplit'
 import { TripFlowNextStepButton } from '@/components/trip/TripFlowNextStepButton'
@@ -27,11 +30,6 @@ const Step4GlobeHero = lazy(() => import('@/components/trip/Step4GlobeHero'))
 export default function TripNewStep4PageContent({ arrival, mergedNavState }) {
   const navigate = useNavigate()
   const location = useLocation()
-
-  const step4PreviousPath = useMemo(() => {
-    if (mergedNavState?.fromDestinationPage) return '/trips/new/destination'
-    return '/trips/new/step3'
-  }, [mergedNavState])
 
   /** fetchTripDatesForStep4 결과 (목데이터 또는 추후 API) */
   const [tripWindow, setTripWindow] = useState(null)
@@ -172,7 +170,7 @@ export default function TripNewStep4PageContent({ arrival, mergedNavState }) {
         }
         left={
           <>
-            <TripFlowDesktopBar backTo={step4PreviousPath} className="mb-6" />
+            <TripNewFlowDesktopPrevBar className="mb-6" />
 
             <StepHeader
               currentStep={STEP4_CONFIG.currentStep}
@@ -218,12 +216,6 @@ export default function TripNewStep4PageContent({ arrival, mergedNavState }) {
 
       <div className="md:hidden">
         <div className="px-5 pt-4 pb-44">
-          <Link
-            to={step4PreviousPath}
-            className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-teal-700 hover:text-teal-900"
-          >
-            ← 이전 단계
-          </Link>
           <StepHeader
             currentStep={STEP4_CONFIG.currentStep}
             totalSteps={STEP4_CONFIG.totalSteps}
@@ -238,6 +230,7 @@ export default function TripNewStep4PageContent({ arrival, mergedNavState }) {
             className="mb-5"
             titleClassName="text-2xl"
             subtitleClassName="text-sm"
+            topEndAction={<TripNewFlowMobilePrevAction />}
           />
 
           <div className="space-y-4 mb-5">

@@ -1,7 +1,10 @@
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { STEP2_CONFIG, STEP2_ICON_PATHS, OPTION_CARDS } from '@/mocks/tripNewStep2Data'
 import StepHeader from '@/components/common/StepHeader'
-import { TripFlowDesktopBar } from '@/components/common/TripFlowTopBar'
+import {
+  TripNewFlowDesktopPrevBar,
+  TripNewFlowMobilePrevAction,
+} from '@/components/trip/TripNewFlowPrevControls'
 
 /* ─────────────────────────────────────────────
    범용 SVG 아이콘
@@ -84,7 +87,7 @@ function TripNewStep2Page() {
       <div className="hidden md:block">
         <div className="mx-auto max-w-5xl px-6 py-10">
 
-          <TripFlowDesktopBar backTo="/" className="mb-4" />
+          <TripNewFlowDesktopPrevBar className="mb-4" to="/" label="홈으로" />
 
           <StepHeader
             currentStep={STEP2_CONFIG.currentStep}
@@ -148,13 +151,6 @@ function TripNewStep2Page() {
       ══════════════════════════════════ */}
       <div className="md:hidden">
         <div className="px-5 pt-4 pb-32">
-          <Link
-            to="/"
-            className="mb-3 inline-flex items-center gap-1 text-sm font-medium text-teal-700 hover:text-teal-900"
-          >
-            ← 내 여행으로
-          </Link>
-
           <StepHeader
             currentStep={STEP2_CONFIG.currentStep}
             totalSteps={STEP2_CONFIG.totalSteps}
@@ -167,6 +163,7 @@ function TripNewStep2Page() {
             }
             className="mb-4"
             titleClassName="text-2xl"
+            topEndAction={<TripNewFlowMobilePrevAction to="/" label="홈으로" />}
           />
 
           {/* 옵션 카드 */}

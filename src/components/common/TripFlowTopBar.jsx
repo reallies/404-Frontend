@@ -5,10 +5,21 @@ import BrandLogo from '@/components/common/BrandLogo'
 export const TRIP_FLOW_MOBILE_BAR_CLASS =
   'md:hidden sticky z-40 w-full border-b border-gray-100 bg-white top-[calc(3.5rem+env(safe-area-inset-top,0px))]'
 
-export function TripFlowDesktopBar({ backTo, className = '' }) {
+/** `backTo` 생략 시 브라우저 히스토리 한 단계 뒤로(`navigate(-1)`), 지정 시 해당 경로로 이동 */
+export function TripFlowDesktopBar({
+  backTo,
+  className = '',
+  showBackIcon = true,
+  label,
+  ariaLabel,
+}) {
   return (
     <div className={`relative z-[35] flex justify-end ${className}`}>
-      <BackButton to={backTo} />
+      {backTo != null && backTo !== '' ? (
+        <BackButton to={backTo} showIcon={showBackIcon} label={label} ariaLabel={ariaLabel} />
+      ) : (
+        <BackButton showIcon={showBackIcon} label={label} ariaLabel={ariaLabel} />
+      )}
     </div>
   )
 }
