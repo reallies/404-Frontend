@@ -4,6 +4,7 @@ import BrandLogo from '@/components/common/BrandLogo'
 import { consumeAuthCallback } from '@/api/auth'
 import {
   AUTH_CONSENT_PATH,
+  FEATURE_PROFILE_ONBOARDING_ENABLED,
   SESSION_LAST_SOCIAL_PROVIDER,
   hasAcceptedLegalConsent,
   hasCompletedOnboarding,
@@ -16,7 +17,7 @@ import {
  *   1. URL hash 또는 Supabase 세션에서 access_token + provider + sub 추출 (`consumeAuthCallback`).
  *   2. sub 를 `onboardingGate` 의 mock sub 위치(localStorage) 에 덮어씀 →
  *      기존 게이트 유틸(`hasCompletedOnboarding`, `hasAcceptedLegalConsent`)이 **그대로** 실 사용자용으로 작동.
- *   3. 기존/신규 사용자 분기: 온보딩 완료 → /, 약관 미동의 → /auth/consent, 약관만 OK → /onboarding.
+ *   3. 기존/신규 분기: 약관 미동의 → /auth/consent, 약관 OK + 온보딩 플래그 on + 미완 → /onboarding, 그 외 → /.
  *
  * 이 페이지는 팀원 작업 중인 `AuthConsentPage.jsx` / `onboardingGate.js` 를 **수정하지 않고** 동일 계약을 재사용.
  */
@@ -108,9 +109,9 @@ export default function AuthCallbackPage() {
 
 function resolveNext(sub) {
   if (!sub) return AUTH_CONSENT_PATH
-  if (hasCompletedOnboarding(sub)) return '/'
   if (!hasAcceptedLegalConsent(sub)) return AUTH_CONSENT_PATH
-  return '/onboarding'
+  if (FEATURE_PROFILE_ONBOARDING_ENABLED && !hasCompletedOnboarding(sub)) return '/onboarding'
+  return '/'
 }
 
 function mapCallbackError(code) {

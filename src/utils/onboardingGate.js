@@ -2,18 +2,16 @@
  * 온보딩·법적 동의 진입 게이트 — **백엔드 없을 때** 소셜 로그인 직후 분기용 플레이스홀더.
  *
  * ## 제품 흐름 (프론트 시뮬레이션)
- * - **신규(첫 서비스 이용)**: 소셜 로그인 성공 → `/auth/consent`(약관·개인정보) → `/onboarding` → 완료 후 홈
- * - **기존 사용자**: 소셜 로그인 성공 → **바로 `/` (동의·온보딩 화면 생략)**
+ * - **신규(첫 이용)**: 소셜 로그인 성공 → `/auth/consent` → 동의 완료 후 **`FEATURE_PROFILE_ONBOARDING_ENABLED`가 true면 `/onboarding`, false면 바로 `/`**
+ * - **기존(이미 약관 동의한 계정)**: 소셜 로그인 성공 → **바로 `/`** (동의·추가 단계 생략)
  *
- * 여기서 **「기존 사용자」**는 로컬 스토리지상 **프로필 온보딩까지 완료한 계정**과 동일합니다.
- * (실서비스에서는 백엔드의 `onboarding_completed` / `profile_completed` 등으로 같은 의미를 쓰면 됩니다.)
- * 온보딩을 **중간에만** 하고 나간 계정은 다음 로그인 시 **남은 단계(온보딩)** 로 이어집니다.
+ * `FEATURE_PROFILE_ONBOARDING_ENABLED`가 false일 때는 `/onboarding` 라우트가 홈으로 리다이렉트되며, 페이지·컴포넌트는 보관만 합니다.
  *
  * ## 로그아웃 후 재로그인 (실서비스와 동일한 의도)
  * - 로그아웃 UI는 `/login`(소셜 로그인 페이지)으로 보냅니다.
  * - `clearClientSessionForLogout()`은 **세션만** 지우고, `localStorage`의 동의·온보딩 완료·프로바이더별 mock `sub`는 **유지**합니다.
- * - 따라서 이미 한 번 전체 플로우를 마친 사용자가 **같은 소셜 버튼**으로 다시 로그인하면 `resolvePostSocialLoginPath`가 `hasCompletedOnboarding(sub)`로 곧바로 `/`를 반환합니다.
- * - 실연동 시: 로그아웃은 토큰/세션만 무효화하고, 재로그인 OAuth 완료 후 서버가 `onboarding_completed` 등을 내려주면 동일하게 홈으로 보내면 됩니다.
+ * - 약관 동의까지 마친 계정은 재로그인 시 `hasAcceptedLegalConsent(sub)`로 곧바로 `/`로 보냅니다.
+ * - 실연동 시: 로그아웃은 토큰/세션만 무효화하고, 재로그인 후 서버가 `legal_consent_at` 등을 내려주면 동일하게 홈으로 보내면 됩니다.
  *
  * 백엔드 연동 후:
  * - OAuth 콜백에서 `user.sub`(또는 id)와 서버 플래그만 보고 `navigate(...)` 분기하면 되고,
@@ -21,6 +19,13 @@
  */
 
 const NS = 'checkmate'
+
+/**
+ * 프로필 온보딩(`/onboarding`) 사용 여부. false면 약관 동의 직후 홈으로만 이동하고 라우트는 `/`로 리다이렉트.
+ * 나중에 다시 켤 때 true로 변경하면 됩니다.
+ */
+export const FEATURE_PROFILE_ONBOARDING_ENABLED = false
+
 const KEY_ONBOARDED = `${NS}:onboarded_account_ids`
 const KEY_LEGAL_CONSENT = `${NS}:legal_consent_account_ids`
 const mockSubKey = (provider) => `${NS}:mock_oauth_sub:${String(provider).toLowerCase()}`
@@ -149,7 +154,7 @@ export function markLegalConsentAccepted(accountSubject, options = {}) {
 
 /**
  * 소셜 로그인 성공 직후(플레이스홀더 클릭) 이동 경로.
- * 순서: 기존(온보딩 완료) → 홈 / 신규·미동의 → 동의 / 동의만 한 신규 → 온보딩
+ * 순서: 약관 미동의 → 동의 화면 / 약관 완료 + 온보딩 플래그 on + 프로필 미완 → 온보딩 / 그 외 → 홈
  *
  * @param {'google'|'kakao'|'naver'} provider
  * @returns {'/'|'/auth/consent'|'/onboarding'}
@@ -159,9 +164,9 @@ export function resolvePostSocialLoginPath(provider) {
   const p = String(provider).toLowerCase()
   sessionStorage.setItem(SESSION_LAST_SOCIAL_PROVIDER, p)
   const sub = getOrCreateMockOAuthSubject(p)
-  if (hasCompletedOnboarding(sub)) return '/'
   if (!hasAcceptedLegalConsent(sub)) return AUTH_CONSENT_PATH
-  return '/onboarding'
+  if (FEATURE_PROFILE_ONBOARDING_ENABLED && !hasCompletedOnboarding(sub)) return '/onboarding'
+  return '/'
 }
 
 export function getActiveOnboardingSubject() {
@@ -178,19 +183,20 @@ export function getActiveOnboardingSubject() {
 export function getOnboardingEntryRedirect() {
   const sub = getActiveOnboardingSubject()
   if (!sub) return 'login'
+  if (!FEATURE_PROFILE_ONBOARDING_ENABLED) return 'home'
   if (hasCompletedOnboarding(sub)) return 'home'
   if (!hasAcceptedLegalConsent(sub)) return 'consent'
   return null
 }
 
 /**
- * 동의 페이지 진입 가능 여부(이미 동의·온보딩 끝이면 다른 곳으로 보냄).
+ * 동의 페이지 진입 가능 여부(이미 동의했으면 다음 단계로 보냄).
  * @returns {'login'|'home'|'onboarding'|null} null이면 동의 화면 유지
  */
 export function getAuthConsentEntryRedirect() {
   const sub = getActiveOnboardingSubject()
   if (!sub) return 'login'
-  if (hasCompletedOnboarding(sub)) return 'home'
-  if (hasAcceptedLegalConsent(sub)) return 'onboarding'
-  return null
+  if (!hasAcceptedLegalConsent(sub)) return null
+  if (FEATURE_PROFILE_ONBOARDING_ENABLED && !hasCompletedOnboarding(sub)) return 'onboarding'
+  return 'home'
 }
