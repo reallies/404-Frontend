@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAutoAnimate } from '@formkit/auto-animate/react'
 import step3DesktopMascotUrl from '@/assets/step3-desktop-mascot.png'
@@ -28,16 +28,6 @@ const COUNTRY_OPTIONS = [
   { value: 'OTHER', label: '기타' },
 ]
 
-/** 여권 VIZ 영문: 글자 구간 사이에 공백·하이픈·어포스트로피 반복 허용 (MRZ와는 별개) */
-const LATIN_NAME_RE = /^[A-Za-z]+(?:[\s'-][A-Za-z]+)*$/
-
-/** 프로필 한글 이름: 완성형 한글만, 공백으로 성·이름 구분 가능 */
-const HANGUL_NAME_RE = /^[가-힣]+(?: [가-힣]+)*$/
-
-/** 온보딩 섹션「다음」— 서비스 주요 CTA와 동일한 amber 톤 */
-const ONBOARDING_NEXT_BTN_CLASS =
-  'mt-4 w-full rounded-xl bg-amber-400 py-3.5 text-sm font-bold text-gray-900 shadow-sm shadow-amber-900/10 transition hover:bg-amber-500 hover:shadow-md disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none'
-
 /** 온보딩 마지막「체크메이트 시작하기」 */
 const ONBOARDING_FINISH_BTN_CLASS =
   'mt-8 w-full rounded-xl bg-amber-400 py-4 text-base font-bold text-gray-900 shadow-lg shadow-amber-900/15 transition hover:bg-amber-500 hover:shadow-md disabled:cursor-not-allowed disabled:bg-gray-300 disabled:shadow-none'
@@ -54,17 +44,8 @@ function isoToLabel(iso) {
   return `${y}년 ${parseInt(m, 10)}월 ${parseInt(d, 10)}일`
 }
 
-/** 텍스트 입력: Enter 시 폼 제출 방지 + 조건 충족 시 `다음`과 동일 동작 */
-function handleEnterToAdvanceInput(e, canProceed, advance) {
-  if (e.key !== 'Enter' || e.repeat) return
-  if (e.nativeEvent?.isComposing) return
-  e.preventDefault()
-  if (!canProceed) return
-  advance()
-}
-
 /**
- * 국적·발급국 등(선택 + 다음): 열린 listbox 내부·`data-onboarding-next` 버튼은 그대로 둠
+ * 여권 국가 선택: 열린 listbox 내부·`data-onboarding-next` 버튼은 그대로 둠
  */
 function handleEnterToAdvanceSection(e, canProceed, advance) {
   if (e.key !== 'Enter' || e.repeat) return
@@ -101,95 +82,29 @@ function SectionInputConfirmed({ show, align = 'start' }) {
 }
 
 /**
- * 소셜 로그인 직후 1회 프로필 수집 — **기본 정보**(성함·성별·생년월일·이메일) → **여권 정보**(영문명·번호·국적·발급국·만료·발급일).
+ * 소셜 로그인 직후 1회 프로필 수집 — **성별·생년월일** → **여권에 기재된 국가**.
  * 섹션은 순차적으로만 펼쳐지며(@formkit/auto-animate), 이전 단계는 살짝 흐리게.
  */
 export default function OnboardingProfilePage() {
   const navigate = useNavigate()
   const [listRef] = useAutoAnimate({ duration: 320, easing: 'ease-out' })
 
-  const [passportFirstName, setPassportFirstName] = useState('')
-  const [passportLastName, setPassportLastName] = useState('')
-  const [passportNumber, setPassportNumber] = useState('')
-  const [nationality, setNationality] = useState('')
   const [gender, setGender] = useState('')
   const [birthDate, setBirthDate] = useState('')
-  const [passportExpiryDate, setPassportExpiryDate] = useState('')
-  const [passportIssuingCountry, setPassportIssuingCountry] = useState('')
-  const [passportIssueDate, setPassportIssueDate] = useState('')
-  const [profileNameKo, setProfileNameKo] = useState('')
-  const [contactEmail, setContactEmail] = useState('')
+  /** 여권 데이터에 표시되는 국가(국적·발급국 등 여권 상 국가 필드에 해당) */
+  const [passportCountryOnRecord, setPassportCountryOnRecord] = useState('')
 
-  /** 순차 단계 인덱스 (만료 선택 후 발급일까지 약 10) */
+  /** 순차 단계: 성별 1, 생년월일 2, 여권 국가(+하단 완료 버튼) 3 */
   const [revealed, setRevealed] = useState(1)
   const [finishModalOpen, setFinishModalOpen] = useState(false)
 
   const bottomAnchorRef = useRef(null)
-  const firstNameId = useId()
-  const lastNameId = useId()
-  const passportNoId = useId()
-  const profileNameKoId = useId()
-  const contactEmailId = useId()
 
-  const normalizedPassportNumber = passportNumber.replace(/\s+/g, '').toUpperCase()
-
-  const firstNameOk = LATIN_NAME_RE.test(passportFirstName.trim())
-  const lastNameOk = LATIN_NAME_RE.test(passportLastName.trim())
-  const passportNoOk = /^[A-Z0-9]{6,14}$/.test(normalizedPassportNumber)
-  const nationalityOk = nationality !== ''
   const genderOk = gender !== ''
   const birthOk = birthDate !== ''
-  const profileNameKoTrim = profileNameKo.trim()
-  const profileNameKoOk =
-    profileNameKoTrim.length >= 2 && profileNameKoTrim.length <= 40 && HANGUL_NAME_RE.test(profileNameKoTrim)
-  const contactEmailTrim = contactEmail.trim()
-  const contactEmailOk = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test(contactEmailTrim)
-  const expiryOk = passportExpiryDate !== ''
-  const issuingOk = passportIssuingCountry !== ''
-  const issueOk = passportIssueDate !== ''
+  const passportCountryOk = passportCountryOnRecord !== ''
 
-  const todayEnd = useMemo(() => {
-    const t = new Date()
-    t.setHours(23, 59, 59, 999)
-    return t
-  }, [])
-
-  const expiryMinDate = useMemo(() => parseIsoDate(birthDate) ?? new Date(1900, 0, 1), [birthDate])
-  const expiryMaxDate = useMemo(() => new Date(2100, 11, 31), [])
-
-  const issueMinDate = useMemo(() => parseIsoDate(birthDate) ?? new Date(1900, 0, 1), [birthDate])
-
-  const issueMaxDate = useMemo(() => {
-    const expiry = parseIsoDate(passportExpiryDate)
-    if (!expiry) return todayEnd
-    return expiry.getTime() < todayEnd.getTime() ? expiry : todayEnd
-  }, [passportExpiryDate, todayEnd])
-
-  const birth = parseIsoDate(birthDate)
-  const issue = parseIsoDate(passportIssueDate)
-  const expiry = parseIsoDate(passportExpiryDate)
-
-  const datesConsistent =
-    birth &&
-    issue &&
-    expiry &&
-    birth.getTime() <= issue.getTime() &&
-    issue.getTime() <= expiry.getTime() &&
-    issue.getTime() <= todayEnd.getTime()
-
-  const canFinish =
-    firstNameOk &&
-    lastNameOk &&
-    passportNoOk &&
-    nationalityOk &&
-    genderOk &&
-    birthOk &&
-    profileNameKoOk &&
-    contactEmailOk &&
-    expiryOk &&
-    issuingOk &&
-    issueOk &&
-    datesConsistent
+  const canFinish = genderOk && birthOk && passportCountryOk
 
   const scrollToBottom = useCallback(() => {
     window.setTimeout(() => {
@@ -197,78 +112,25 @@ export default function OnboardingProfilePage() {
     }, 80)
   }, [])
 
-  const goProfileNameKoNext = useCallback(() => {
-    if (!profileNameKoOk) return
-    setRevealed((r) => Math.max(r, 2))
-    scrollToBottom()
-  }, [profileNameKoOk, scrollToBottom])
-
-  const goEmailNext = useCallback(() => {
-    if (!contactEmailOk) return
-    setRevealed((r) => Math.max(r, 5))
-    scrollToBottom()
-  }, [contactEmailOk, scrollToBottom])
-
-  const goNamesNext = useCallback(() => {
-    if (!firstNameOk || !lastNameOk) return
-    setRevealed((r) => Math.max(r, 6))
-    scrollToBottom()
-  }, [firstNameOk, lastNameOk, scrollToBottom])
-
-  const goPassportNext = useCallback(() => {
-    if (!passportNoOk) return
-    setRevealed((r) => Math.max(r, 7))
-    scrollToBottom()
-  }, [passportNoOk, scrollToBottom])
-
-  const goNationalityNext = useCallback(() => {
-    if (!nationalityOk) return
-    setRevealed((r) => Math.max(r, 8))
-    scrollToBottom()
-  }, [nationalityOk, scrollToBottom])
-
-  const goIssuingNext = useCallback(() => {
-    if (!issuingOk) return
-    setRevealed((r) => Math.max(r, 9))
-    scrollToBottom()
-  }, [issuingOk, scrollToBottom])
+  const openFinishModalIfReady = useCallback(() => {
+    if (!passportCountryOk) return
+    setFinishModalOpen(true)
+  }, [passportCountryOk])
 
   const completeOnboarding = useCallback(() => {
     if (!canFinish) return
-    // TODO: API `PATCH /users/me/passport` 또는 Supabase 등
-    const passportPayload = {
-      profileNameKo: profileNameKoTrim,
-      contactEmail: contactEmailTrim.toLowerCase(),
-      passportFirstName: passportFirstName.trim().toUpperCase(),
-      passportLastName: passportLastName.trim().toUpperCase(),
-      passportNumber: normalizedPassportNumber,
-      nationality,
+    // TODO: API `PATCH /users/me` 또는 Supabase 등
+    const profilePayload = {
       gender,
       dateOfBirth: birthDate,
-      passportExpiryDate,
-      passportIssuingCountry,
-      passportIssueDate,
+      passportCountryCode: passportCountryOnRecord,
     }
-    void passportPayload
+    void profilePayload
     const sub = getActiveOnboardingSubject()
     if (sub) markOnboardingComplete(sub)
     setFinishModalOpen(false)
     navigate('/', { replace: true })
-  }, [
-    birthDate,
-    canFinish,
-    contactEmailTrim,
-    gender,
-    nationality,
-    navigate,
-    normalizedPassportNumber,
-    passportExpiryDate,
-    passportFirstName,
-    passportIssueDate,
-    passportIssuingCountry,
-    passportLastName,
-    profileNameKoTrim,
-  ])
+  }, [birthDate, canFinish, gender, navigate, passportCountryOnRecord])
 
   const handleFormSubmit = (e) => {
     e.preventDefault()
@@ -343,7 +205,7 @@ export default function OnboardingProfilePage() {
             <span>에 오신 것을 환영합니다!</span>
           </h1>
           <p className="mt-2 text-sm text-gray-500">
-            기본 정보와 여권 정보를 순서대로 입력하면 나중에 서비스에 안전하게 저장할 수 있어요.
+            성별·생년월일과 여권에 적힌 국가만 입력하면 나중에 서비스에 안전하게 저장할 수 있어요.
           </p>
         </header>
 
@@ -351,87 +213,43 @@ export default function OnboardingProfilePage() {
           <div ref={listRef} className="flex flex-col gap-6">
             <div>
               <h2 className="mb-3 text-left text-base font-bold tracking-tight text-gray-900">기본 정보</h2>
-              <p className="text-xs text-gray-500">
-                성함·성별·생년월일·이메일 등 서비스에 필요한 기본 프로필이에요.
-              </p>
+              <p className="text-xs text-gray-500">성별과 생년월일을 입력해 주세요.</p>
             </div>
 
-            {/* 1 성함(한글) */}
-            <section className={sectionShell(revealed >= 2 && profileNameKoOk)}>
+            {/* 1 성별 */}
+            <section className={sectionShell(revealed >= 2 && genderOk)}>
               <div className="p-5">
-                <label htmlFor={profileNameKoId} className="mb-1 block text-sm font-semibold text-gray-800">
-                  성함(한글)
-                </label>
-                <p className="mb-3 text-xs text-gray-500">주민등록증·여권에 적힌 이름과 같이 적어 주세요.</p>
-                <input
-                  id={profileNameKoId}
-                  name="profileNameKo"
-                  type="text"
-                  autoComplete="name"
-                  value={profileNameKo}
-                  onChange={(e) => setProfileNameKo(e.target.value)}
-                  onKeyDown={(e) => handleEnterToAdvanceInput(e, profileNameKoOk, goProfileNameKoNext)}
-                  placeholder="홍길동"
-                  className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 placeholder:text-gray-400 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
-                />
-                {profileNameKoTrim.length > 0 && !profileNameKoOk && (
-                  <p className="mt-2 text-xs text-red-600" role="alert">
-                    완성형 한글 2자 이상으로 입력해 주세요.
-                  </p>
-                )}
-                <SectionInputConfirmed show={profileNameKoOk} />
-                <button
-                  type="button"
-                  data-onboarding-next
-                  disabled={!profileNameKoOk}
-                  onClick={(e) => {
-                    e.preventDefault()
-                    goProfileNameKoNext()
-                  }}
-                  className={ONBOARDING_NEXT_BTN_CLASS}
-                >
-                  다음
-                </button>
+                <p className="mb-3 text-sm font-semibold text-gray-800">성별 (Gender)</p>
+                <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                  {[
+                    { v: 'female', label: '여성' },
+                    { v: 'male', label: '남성' },
+                  ].map(({ v, label }) => (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => {
+                        setGender(v)
+                        setRevealed((r) => Math.max(r, 2))
+                        scrollToBottom()
+                      }}
+                      className={`rounded-xl border-2 py-3 text-sm font-bold transition ${
+                        gender === v
+                          ? 'border-cyan-500 bg-cyan-50 text-cyan-800'
+                          : 'border-gray-200 bg-gray-50 text-gray-700 hover:border-cyan-200'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <SectionInputConfirmed show={genderOk} />
               </div>
             </section>
 
-            {/* 2 성별 */}
-            {revealed >= 2 && profileNameKoOk && (
-              <section className={sectionShell(revealed >= 3 && genderOk)}>
-                <div className="p-5">
-                  <p className="mb-1 text-sm font-semibold text-gray-800">성별 (Gender)</p>
-                  <p className="mb-3 text-xs text-gray-500">여권·신분 정보와 동일하게 선택해 주세요.</p>
-                  <div className="grid grid-cols-2 gap-2 sm:gap-3">
-                    {[
-                      { v: 'female', label: '여성' },
-                      { v: 'male', label: '남성' },
-                    ].map(({ v, label }) => (
-                      <button
-                        key={v}
-                        type="button"
-                        onClick={() => {
-                          setGender(v)
-                          setRevealed((r) => Math.max(r, 3))
-                          scrollToBottom()
-                        }}
-                        className={`rounded-xl border-2 py-3 text-sm font-bold transition ${
-                          gender === v
-                            ? 'border-cyan-500 bg-cyan-50 text-cyan-800'
-                            : 'border-gray-200 bg-gray-50 text-gray-700 hover:border-cyan-200'
-                        }`}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                  <SectionInputConfirmed show={genderOk} />
-                </div>
-              </section>
-            )}
-
-            {/* 3 생년월일 */}
-            {revealed >= 3 && genderOk && (
-              <section className={sectionShell(revealed >= 4 && birthOk)}>
+            {/* 2 생년월일 */}
+            {revealed >= 2 && genderOk && (
+              <section className={sectionShell(revealed >= 3 && birthOk)}>
                 <div className="p-5">
                   <p className="mb-2 text-sm font-semibold text-gray-800">생년월일 (Date of Birth)</p>
                   <p className="mb-3 text-xs text-gray-500">연·월을 고른 뒤 날짜를 눌러 주세요.</p>
@@ -442,7 +260,7 @@ export default function OnboardingProfilePage() {
                     onChange={(iso) => {
                       setBirthDate(iso)
                       if (iso) {
-                        setRevealed((r) => Math.max(r, 4))
+                        setRevealed((r) => Math.max(r, 3))
                         scrollToBottom()
                       }
                     }}
@@ -455,290 +273,32 @@ export default function OnboardingProfilePage() {
               </section>
             )}
 
-            {/* 4 이메일 */}
-            {revealed >= 4 && birthOk && (
-              <section className={sectionShell(revealed >= 5 && contactEmailOk)}>
-                <div className="p-5">
-                  <label htmlFor={contactEmailId} className="mb-1 block text-sm font-semibold text-gray-800">
-                    이메일
-                  </label>
-                  <p className="mb-3 text-xs text-gray-500">예약·알림을 받을 주소예요.</p>
-                  <input
-                    id={contactEmailId}
-                    name="contactEmail"
-                    type="email"
-                    autoComplete="email"
-                    value={contactEmail}
-                    onChange={(e) => setContactEmail(e.target.value)}
-                    onKeyDown={(e) => handleEnterToAdvanceInput(e, contactEmailOk, goEmailNext)}
-                    placeholder="you@example.com"
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 placeholder:text-gray-400 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
-                  />
-                  {contactEmailTrim.length > 0 && !contactEmailOk && (
-                    <p className="mt-2 text-xs text-red-600" role="alert">
-                      올바른 이메일 형식인지 확인해 주세요.
-                    </p>
-                  )}
-                  <SectionInputConfirmed show={contactEmailOk} />
-                  <button
-                    type="button"
-                    data-onboarding-next
-                    disabled={!contactEmailOk}
-                    onClick={(e) => {
-                      e.preventDefault()
-                      goEmailNext()
-                    }}
-                    className={ONBOARDING_NEXT_BTN_CLASS}
-                  >
-                    다음
-                  </button>
-                </div>
-              </section>
-            )}
-
-            {revealed >= 5 && contactEmailOk && (
+            {revealed >= 3 && birthOk && (
               <div className="pt-2">
-                <h2 className="mb-3 text-left text-base font-bold tracking-tight text-gray-900">여권 정보</h2>
-                <p className="text-xs text-gray-500">여권 원본과 동일하게 적어 주세요.</p>
-              </div>
-            )}
-
-            {/* 5 여권 영문 이름 */}
-            {revealed >= 5 && contactEmailOk && (
-              <section className={sectionShell(revealed >= 6 && firstNameOk && lastNameOk)}>
-              <div className="p-5">
-                <p className="mb-2 text-sm font-semibold text-gray-800">여권 영문 이름</p>
-                <p className="mb-4 text-left text-xs leading-relaxed text-gray-500">
-                  여권 사진면에 인쇄된 영문 이름과 동일하게 적되,
-                  <br />
-                  공백·하이픈(-)·작은따옴표(')가 있으면 그대로 입력해 주세요.
+                <h2 className="mb-3 text-left text-base font-bold tracking-tight text-gray-900">여권에 적힌 국가</h2>
+                <p className="text-xs text-gray-500">
+                  여권 정보 페이지에 표시된 국가(국적·발급국 등)에 맞게 선택해 주세요.
                 </p>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <label className="block text-left">
-                    <span className="mb-1.5 block text-xs font-medium text-gray-600">First name(성)</span>
-                    <input
-                      id={firstNameId}
-                      name="passportFirstName"
-                      type="text"
-                      autoComplete="given-name"
-                      value={passportFirstName}
-                      onChange={(e) => setPassportFirstName(e.target.value.toUpperCase())}
-                      onKeyDown={(e) => handleEnterToAdvanceInput(e, firstNameOk && lastNameOk, goNamesNext)}
-                      placeholder="HONG"
-                      className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 placeholder:text-gray-400 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
-                    />
-                  </label>
-                  <label className="block text-left">
-                    <span className="mb-1.5 block text-xs font-medium text-gray-600">Last name(이름)</span>
-                    <input
-                      id={lastNameId}
-                      name="passportLastName"
-                      type="text"
-                      autoComplete="family-name"
-                      value={passportLastName}
-                      onChange={(e) => setPassportLastName(e.target.value.toUpperCase())}
-                      onKeyDown={(e) => handleEnterToAdvanceInput(e, firstNameOk && lastNameOk, goNamesNext)}
-                      placeholder="GILDONG"
-                      className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 text-base text-gray-900 placeholder:text-gray-400 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
-                    />
-                  </label>
-                </div>
-                {((passportFirstName.length > 0 && !firstNameOk) ||
-                  (passportLastName.length > 0 && !lastNameOk)) && (
-                  <p
-                    className="mt-2 text-left text-xs whitespace-nowrap text-red-600 overflow-x-auto [-webkit-overflow-scrolling:touch] [scrollbar-width:thin]"
-                    role="alert"
-                  >
-                    {`영문·공백·하이픈(-)·작은따옴표(')만 사용할 수 있어요.`}
-                  </p>
-                )}
-                <SectionInputConfirmed show={firstNameOk && lastNameOk} />
-                <button
-                  type="button"
-                  data-onboarding-next
-                  disabled={!firstNameOk || !lastNameOk}
-                  onClick={(e) => {
-                    e.preventDefault()
-                    goNamesNext()
-                  }}
-                  className={ONBOARDING_NEXT_BTN_CLASS}
-                >
-                  다음
-                </button>
               </div>
-            </section>
             )}
 
-            {/* 6 여권 번호 */}
-            {revealed >= 6 && (
-              <section className={sectionShell(revealed >= 7 && passportNoOk)}>
-                <div className="p-5">
-                  <label htmlFor={passportNoId} className="mb-2 block text-sm font-semibold text-gray-800">
-                    여권 번호 (Passport Number)
-                  </label>
-                  <p className="mb-3 text-xs text-gray-500">공백 없이 영문·숫자만 입력해 주세요.</p>
-                  <input
-                    id={passportNoId}
-                    name="passportNumber"
-                    type="text"
-                    autoCapitalize="characters"
-                    autoCorrect="off"
-                    spellCheck={false}
-                    value={passportNumber}
-                    onChange={(e) => setPassportNumber(e.target.value.toUpperCase())}
-                    onKeyDown={(e) => handleEnterToAdvanceInput(e, passportNoOk, goPassportNext)}
-                    placeholder="M12345678"
-                    className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3.5 font-mono text-base tracking-wide text-gray-900 placeholder:text-gray-400 focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
-                  />
-                  {passportNumber.length > 0 && !passportNoOk && (
-                    <p className="mt-2 text-xs text-red-600" role="alert">
-                      6~14자의 영문 대문자와 숫자만 사용할 수 있어요.
-                    </p>
-                  )}
-                  <SectionInputConfirmed show={passportNoOk} />
-                  <button
-                    type="button"
-                    data-onboarding-next
-                    disabled={!passportNoOk}
-                    onClick={(e) => {
-                      e.preventDefault()
-                      goPassportNext()
-                    }}
-                    className={ONBOARDING_NEXT_BTN_CLASS}
-                  >
-                    다음
-                  </button>
-                </div>
-              </section>
-            )}
-
-            {/* 7 국적 */}
-            {revealed >= 7 && (
-              <section className={sectionShell(revealed >= 8 && nationalityOk)}>
+            {revealed >= 3 && birthOk && (
+              <section className={sectionShell(passportCountryOk)}>
                 <div
                   className="p-5"
-                  onKeyDown={(e) => handleEnterToAdvanceSection(e, nationalityOk, goNationalityNext)}
+                  onKeyDown={(e) => handleEnterToAdvanceSection(e, passportCountryOk, openFinishModalIfReady)}
                 >
-                  <label htmlFor="onboarding-nationality" className="mb-2 block text-sm font-semibold text-gray-800">
-                    국적 (Nationality)
+                  <label htmlFor="onboarding-passport-country" className="mb-3 block text-sm font-semibold text-gray-800">
+                    여권에 기재된 국가
                   </label>
-                  <p className="mb-3 text-xs text-gray-500">여권에 적힌 국적을 선택해 주세요.</p>
                   <OnboardingCustomSelect
-                    id="onboarding-nationality"
-                    value={nationality}
-                    onValueChange={setNationality}
+                    id="onboarding-passport-country"
+                    value={passportCountryOnRecord}
+                    onValueChange={setPassportCountryOnRecord}
                     placeholder="국가를 선택해 주세요"
                     options={COUNTRY_OPTIONS}
                   />
-                  <SectionInputConfirmed show={nationalityOk} />
-                  <button
-                    type="button"
-                    data-onboarding-next
-                    disabled={!nationalityOk}
-                    onClick={(e) => {
-                      e.preventDefault()
-                      goNationalityNext()
-                    }}
-                    className={ONBOARDING_NEXT_BTN_CLASS}
-                  >
-                    다음
-                  </button>
-                </div>
-              </section>
-            )}
-
-            {/* 8 발급 국가 */}
-            {revealed >= 8 && nationalityOk && (
-              <section className={sectionShell(revealed >= 9 && issuingOk)}>
-                <div
-                  className="p-5"
-                  onKeyDown={(e) => handleEnterToAdvanceSection(e, issuingOk, goIssuingNext)}
-                >
-                  <label htmlFor="onboarding-issuing-country" className="mb-2 block text-sm font-semibold text-gray-800">
-                    발급 국가 (Issuing Country)
-                  </label>
-                  <p className="mb-3 text-xs text-gray-500">여권을 발급한 국가를 선택해 주세요.</p>
-                  <OnboardingCustomSelect
-                    id="onboarding-issuing-country"
-                    value={passportIssuingCountry}
-                    onValueChange={setPassportIssuingCountry}
-                    placeholder="국가를 선택해 주세요"
-                    options={COUNTRY_OPTIONS}
-                  />
-                  <SectionInputConfirmed show={issuingOk} />
-                  <button
-                    type="button"
-                    data-onboarding-next
-                    disabled={!issuingOk}
-                    onClick={(e) => {
-                      e.preventDefault()
-                      goIssuingNext()
-                    }}
-                    className={ONBOARDING_NEXT_BTN_CLASS}
-                  >
-                    다음
-                  </button>
-                </div>
-              </section>
-            )}
-
-            {/* 9 만료일 */}
-            {revealed >= 9 && issuingOk && (
-              <section className={sectionShell(revealed >= 10 && expiryOk)}>
-                <div className="p-5">
-                  <p className="mb-2 text-sm font-semibold text-gray-800">만료일 (Expiry Date)</p>
-                  <p className="mb-3 text-xs text-gray-500">여권 만료일을 선택해 주세요.</p>
-                  <OnboardingBirthCalendar
-                    key="onboarding-expiry"
-                    value={passportExpiryDate}
-                    initialEmptyYear={2030}
-                    onChange={(iso) => {
-                      setPassportExpiryDate(iso)
-                      if (iso) {
-                        setRevealed((r) => Math.max(r, 10))
-                        scrollToBottom()
-                      }
-                    }}
-                    minDate={expiryMinDate}
-                    maxDate={expiryMaxDate}
-                  />
-                  {passportExpiryDate ? (
-                    <p className="mt-3 text-center text-sm font-medium text-cyan-800">
-                      선택: {isoToLabel(passportExpiryDate)}
-                    </p>
-                  ) : null}
-                  <SectionInputConfirmed show={expiryOk} align="center" />
-                </div>
-              </section>
-            )}
-
-            {/* 10 발급일 */}
-            {revealed >= 10 && expiryOk && (
-              <section className={sectionShell(false)}>
-                <div className="p-5">
-                  <p className="mb-2 text-sm font-semibold text-gray-800">발급일 (Issue Date)</p>
-                  <p className="mb-3 text-xs text-gray-500">
-                    발급일은 생년월일 이후, 오늘 이전이어야 하고 만료일 이전이어야 해요.
-                  </p>
-                  <OnboardingBirthCalendar
-                    key="onboarding-issue"
-                    value={passportIssueDate}
-                    initialEmptyYear={2015}
-                    onChange={setPassportIssueDate}
-                    minDate={issueMinDate}
-                    maxDate={issueMaxDate}
-                  />
-                  {passportIssueDate ? (
-                    <p className="mt-3 text-center text-sm font-medium text-cyan-800">
-                      선택: {isoToLabel(passportIssueDate)}
-                    </p>
-                  ) : null}
-                  <SectionInputConfirmed show={issueOk && datesConsistent} align="center" />
-                  {!datesConsistent && issueOk && birthOk && expiryOk && (
-                    <p className="mt-3 text-center text-xs text-red-600" role="alert">
-                      날짜 순서를 확인해 주세요. (생년월일 ≤ 발급일 ≤ 만료일, 발급일은 오늘까지)
-                    </p>
-                  )}
+                  <SectionInputConfirmed show={passportCountryOk} />
                 </div>
               </section>
             )}
@@ -746,7 +306,7 @@ export default function OnboardingProfilePage() {
 
           <div ref={bottomAnchorRef} className="h-px w-full shrink-0" aria-hidden="true" />
 
-          {revealed >= 10 && (
+          {revealed >= 3 && birthOk && (
             <button
               type="button"
               disabled={!canFinish}
