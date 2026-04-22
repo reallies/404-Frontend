@@ -8,6 +8,7 @@ import {
   setSavedItemChecked,
 } from '@/utils/savedTripItems'
 import { patchGuideArchiveEntry } from '@/utils/guideArchiveStorage'
+import { deselectChecklistItem } from '@/api/checklists'
 import { buildGuideArchiveDateLine, buildGuideArchiveListTitle } from '@/utils/guideArchivePresentation'
 import GuideArchiveProgressBar from '@/components/guide/GuideArchiveProgressBar'
 import {
@@ -291,7 +292,19 @@ export default function GuideArchiveChecklistView({ tripId, entry, onArchiveMuta
       const nextIds = new Set(newItems.map((it) => String(it.id)))
       for (const it of items) {
         const id = String(it.id)
-        if (!nextIds.has(id)) removeSavedItem(tripId, id)
+        if (nextIds.has(id)) continue
+        removeSavedItem(tripId, id)
+        // 서버 ChecklistItem.is_selected 플래그도 되돌린다 (fire-and-forget).
+        // serverId 가 없으면 (목데이터 / context 기반 생성 / 레거시 snapshot) 호출을 건너뛴다.
+        const serverId = it.serverId
+        if (serverId && String(serverId).trim()) {
+          deselectChecklistItem(serverId).catch((err) => {
+            console.warn(
+              `[GuideArchiveChecklistView] deselectChecklistItem(${serverId}) 실패 — localStorage 삭제는 완료:`,
+              err?.response?.data?.message || err?.message || err,
+            )
+          })
+        }
       }
       const totalN = newItems.length
       const checkedN = newItems.filter((it) => nextChecks[String(it.id)]).length

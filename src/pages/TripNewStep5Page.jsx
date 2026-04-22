@@ -16,6 +16,13 @@ import {
   TripNewFlowMobilePrevAction,
 } from '@/components/trip/TripNewFlowPrevControls'
 import { TripFlowNextStepButton } from '@/components/trip/TripFlowNextStepButton'
+import { loadActiveTripPlan, saveActiveTripPlan } from '@/utils/tripPlanContextStorage'
+import { buildCreateTripPayload } from '@/utils/tripPlanToCreatePayload'
+import { saveActiveTripId, clearActiveTripId } from '@/utils/activeTripIdStorage'
+import { createTrip } from '@/api/trips'
+
+/** placeholder 로 써오던 하드코딩 tripId — Trip 생성 실패 시 graceful fallback 용 */
+const PLACEHOLDER_TRIP_ID = '1'
 
 function SvgIcon({ name, className = 'w-6 h-6' }) {
   const composite = STEP5_ICON_COMPOSITE[name]
@@ -74,25 +81,83 @@ export default function TripNewStep5Page() {
 
   const [companionId, setCompanionId] = useState(null)
   const [styleIds, setStyleIds] = useState([])
+  /** Trip 생성 POST 진행 상태 — 버튼 중복 클릭 방지 + 인라인 에러 표시용 */
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState('')
 
   const toggleStyle = useCallback((id) => {
     setStyleIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
   }, [])
 
   const canSubmit = useMemo(
-    () => Boolean(companionId) && styleIds.length > 0,
-    [companionId, styleIds],
+    () => Boolean(companionId) && styleIds.length > 0 && !submitting,
+    [companionId, styleIds, submitting],
   )
 
-  const handleCreatePlan = () => {
+  const handleCreatePlan = async () => {
     if (!canSubmit) return
-    navigate('/trips/1/loading', {
+    setSubmitError('')
+
+    // 백엔드 맞춤 체크리스트 호출(/checklists/generate-from-context) fallback 경로 및
+    // Trip 생성 payload 생성을 위해, 동행·여행 스타일 라벨을 플랜 스토리지에 합쳐 둔다.
+    const existingPlan = loadActiveTripPlan()
+    const companionLabel = COMPANIONS.find((c) => c.id === companionId)?.label ?? null
+    const travelStyleLabels = TRAVEL_STYLES.filter((s) => styleIds.includes(s.id)).map((s) => s.label)
+    const hasPet = companionId === 'withPet'
+    const nextPlan = existingPlan?.destination
+      ? {
+          ...existingPlan,
+          companion: companionLabel,
+          hasPet,
+          travelStyles: travelStyleLabels,
+        }
+      : existingPlan
+    if (nextPlan) saveActiveTripPlan(nextPlan)
+
+    const step5State = { companionId, travelStyleIds: styleIds }
+
+    // 실제 Trip 영속화 시도. 실패해도 기존 context 기반 플로우로 이어지도록 graceful fallback.
+    const payload = buildCreateTripPayload(nextPlan ?? existingPlan, {
+      companionId,
+      hasPet,
+      travelStyleIds: styleIds,
+    })
+
+    let createdTripId = null
+    if (payload) {
+      setSubmitting(true)
+      try {
+        const created = await createTrip(payload)
+        const rawId = created?.id ?? created?.tripId
+        // Prisma BigInt 는 JSON 직렬화 시 문자열로 나올 수 있어 모두 문자열 처리.
+        createdTripId = rawId != null ? String(rawId) : null
+        if (createdTripId) {
+          saveActiveTripId(createdTripId)
+        }
+      } catch (err) {
+        const message =
+          err?.response?.data?.message ||
+          err?.message ||
+          '여행 계획을 저장하지 못했어요. 잠시 후 다시 시도해 주세요.'
+        console.warn('[TripNewStep5Page] createTrip 실패, placeholder 플로우로 fallback:', message)
+        setSubmitError(
+          '여행 계획 저장 중 문제가 발생해 임시로 진행합니다. 계속 문제가 되면 새로고침 후 다시 시도해 주세요.',
+        )
+        clearActiveTripId()
+      } finally {
+        setSubmitting(false)
+      }
+    } else {
+      // payload 구성 실패 (목적지/기간/동행/스타일 미비) → 기존 placeholder 플로우.
+      clearActiveTripId()
+    }
+
+    const targetTripId = createdTripId ?? PLACEHOLDER_TRIP_ID
+    navigate(`/trips/${targetTripId}/loading`, {
       state: {
         ...(location.state ?? {}),
-        step5: {
-          companionId,
-          travelStyleIds: styleIds,
-        },
+        step5: step5State,
+        createdTripId,
       },
     })
   }
@@ -205,15 +270,22 @@ export default function TripNewStep5Page() {
               ))}
             </div>
 
-            <div className="flex justify-end mt-10 pt-4 border-t border-slate-200/70">
-              <TripFlowNextStepButton
-                variant="teal"
-                fullWidth={false}
-                disabled={!canSubmit}
-                onClick={handleCreatePlan}
-              >
-                여행 계획 생성하기
-              </TripFlowNextStepButton>
+            <div className="flex flex-col gap-3 mt-10 pt-4 border-t border-slate-200/70">
+              {submitError ? (
+                <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-950">
+                  {submitError}
+                </p>
+              ) : null}
+              <div className="flex justify-end">
+                <TripFlowNextStepButton
+                  variant="teal"
+                  fullWidth={false}
+                  disabled={!canSubmit}
+                  onClick={handleCreatePlan}
+                >
+                  {submitting ? '여행 계획 저장 중…' : '여행 계획 생성하기'}
+                </TripFlowNextStepButton>
+              </div>
             </div>
           </div>
         </div>
@@ -274,14 +346,19 @@ export default function TripNewStep5Page() {
           </div>
         </div>
 
-        <div className="fixed bottom-16 left-0 right-0 z-40 bg-transparent px-5 pb-3 pt-3 [padding-bottom:max(0.75rem,env(safe-area-inset-bottom))]">
+        <div className="fixed bottom-16 left-0 right-0 z-40 flex flex-col gap-2 bg-transparent px-5 pb-3 pt-3 [padding-bottom:max(0.75rem,env(safe-area-inset-bottom))]">
+          {submitError ? (
+            <p className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+              {submitError}
+            </p>
+          ) : null}
           <TripFlowNextStepButton
             variant="teal"
             disabled={!canSubmit}
             onClick={handleCreatePlan}
             showTrailingIcon={false}
           >
-            여행 계획 생성하기
+            {submitting ? '여행 계획 저장 중…' : '여행 계획 생성하기'}
           </TripFlowNextStepButton>
         </div>
       </div>
