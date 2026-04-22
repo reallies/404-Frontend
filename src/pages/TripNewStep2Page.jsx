@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { STEP2_CONFIG, STEP2_ICON_PATHS, OPTION_CARDS } from '@/mocks/tripNewStep2Data'
 import StepHeader from '@/components/common/StepHeader'
@@ -5,6 +6,7 @@ import {
   TripNewFlowDesktopPrevBar,
   TripNewFlowMobilePrevAction,
 } from '@/components/trip/TripNewFlowPrevControls'
+import { clearActiveTripId } from '@/utils/activeTripIdStorage'
 
 /* ─────────────────────────────────────────────
    범용 SVG 아이콘
@@ -58,6 +60,12 @@ function Step2ChoiceGlyph({ booked, className }) {
 ───────────────────────────────────────────── */
 function TripNewStep2Page() {
   const navigate = useNavigate()
+
+  // 새 여행 플로우 진입 시, 이전 세션에 남은 activeTripId 를 정리해
+  // 다음 /trips/:id/loading 이 엉뚱한 id 로 잡히지 않도록 한다.
+  useEffect(() => {
+    clearActiveTripId()
+  }, [])
 
   const handleCardNavigate = (cardId) => {
     if (cardId === 'notBooked') {

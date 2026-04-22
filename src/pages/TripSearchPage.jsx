@@ -1,6 +1,12 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useNavigate, useParams, useSearchParams, Link } from 'react-router-dom'
 import { CATEGORIES, MOCK_ITEMS, TRIP_SEARCH_CONTEXT } from '@/mocks/searchData'
+import {
+  generateChecklist,
+  generateChecklistFromContext,
+  selectChecklistItem,
+} from '@/api/checklists'
+import { adaptGeneratedChecklist, getTabCategories } from '@/utils/checklistAdapter'
 import { saveItemForTrip, loadSavedItems } from '@/utils/savedTripItems'
 import { buildTripWindowLabelFromRange } from '@/utils/tripDateFormat'
 import { appendGuideArchiveEntry, getGuideArchiveEntry, patchGuideArchiveEntry } from '@/utils/guideArchiveStorage'
@@ -20,6 +26,14 @@ import {
 } from '@/utils/guideArchiveBaggage'
 import aiSparklesImg from '@/assets/ai-sparkles.png'
 
+/**
+ * 새 여행 플로우(step5 → /trips/1/loading → /trips/1/search) 에서 쓰는 자리표시자 tripId.
+ * 이 경우에는 DB 에 Trip 레코드가 아직 없으므로 `/checklists/generate/:tripId` 는 항상 404 가 된다.
+ * 프론트에서 먼저 감지해 `generate-from-context` 로 바로 가면 백엔드 `Trip 1 not found` WARN 이 사라진다.
+ *
+ * 실제 DB 에 저장된 trip 에서 들어올 때는 이 placeholder 가 아닌 진짜 id 가 URL 에 박힌다.
+ */
+const PLACEHOLDER_TRIP_ID = '1'
 /** 수하물 필터 — 전체: 기내+위탁 모두 */
 const BAGGAGE_FILTER_ALL = 'all'
 
@@ -49,10 +63,43 @@ const trackEvent = (eventName, properties = {}) => {
   console.debug('[Event]', eventName, properties)
 }
 
+/** YYYY-MM-DD → 두 날짜 사이 일수 (최소 1) */
+function diffDaysInclusive(startStr, endStr) {
+  const s = new Date(startStr)
+  const e = new Date(endStr)
+  if (isNaN(s.getTime()) || isNaN(e.getTime())) return 1
+  const days = Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)) + 1
+  return Math.max(1, days)
+}
+
+/**
+ * 로컬 스토리지에 저장된 여행 플랜을
+ * `/checklists/generate-from-context` 바디 형태로 변환.
+ * 최소한 destination + durationDays 가 계산 가능해야 null 이 아닌 값을 돌려준다.
+ */
+function buildContextInputFromPlan(plan) {
+  if (!plan?.destination || !plan.tripStartDate || !plan.tripEndDate) return null
+  const dest = plan.destination
+  const destinationLabel = [dest.country, dest.city].filter(Boolean).join(' (') + (dest.city ? ')' : '')
+  const companions = []
+  if (plan.companion) companions.push(plan.companion)
+  if (plan.hasPet) companions.push('반려동물')
+  return {
+    destination: destinationLabel || dest.country || dest.city || '국내외 여행지',
+    durationDays: diffDaysInclusive(plan.tripStartDate, plan.tripEndDate),
+    tripStart: plan.tripStartDate,
+    companions,
+    purposes: Array.isArray(plan.travelStyles) ? plan.travelStyles : [],
+  }
+}
+
 /** 가이드 보관함 entry.items에 넣는 형태로 변환 */
 function mapMockItemToArchiveItem(i) {
   return {
     id: i.id,
+    // 서버 ChecklistItem.id (BigInt stringified). 보관함 수정/삭제 시
+    // 서버 is_selected 플래그를 되돌리려면 이 값이 반드시 필요하다.
+    serverId: i.serverId ?? null,
     baggageType: i.baggageType,
     category: i.category,
     categoryLabel: i.categoryLabel,
@@ -116,6 +163,15 @@ function TripSearchInner({ tripId }) {
   const [leaveModalOpen, setLeaveModalOpen] = useState(false)
   const [saveConfirmModalOpen, setSaveConfirmModalOpen] = useState(false)
 
+  /**
+   * 백엔드(/checklists/generate/:tripId) 에서 받아온
+   * [카테고리별 필수품 템플릿 + LLM AI 맞춤 추천] 을 프론트 모델로 가공한 결과.
+   * 로딩 실패 시에는 목데이터로 graceful fallback 한다.
+   */
+  const [loadState, setLoadState] = useState({ status: 'loading', fromApi: false })
+  const [apiItems, setApiItems] = useState([])
+  const [apiSummary, setApiSummary] = useState(null)
+
   useEffect(() => {
     const t = Date.now()
     searchStartRef.current = t
@@ -127,6 +183,99 @@ function TripSearchInner({ tripId }) {
     })
   }, [tripId, mergeToArchive, archiveEntryId])
 
+  useEffect(() => {
+    let cancelled = false
+
+    setLoadState({ status: 'loading', fromApi: false })
+
+    const applyAdapted = (data, via) => {
+      if (cancelled) return
+      const adapted = adaptGeneratedChecklist(data)
+      setApiItems(adapted.items)
+      setApiSummary(adapted.summary)
+      setLoadState({ status: 'ready', fromApi: true, via })
+      trackEvent('search_items_loaded', {
+        trip_id: tripId,
+        via,
+        total: adapted.items.length,
+        from_template: adapted.summary?.fromTemplate ?? 0,
+        from_llm: adapted.summary?.fromLlm ?? 0,
+        llm_tokens: adapted.summary?.llmTokensUsed ?? 0,
+        model: adapted.summary?.model ?? null,
+      })
+    }
+
+    const applyFallback = (errorMessage) => {
+      if (cancelled) return
+      setApiItems([])
+      setApiSummary(null)
+      setLoadState({
+        status: 'fallback',
+        fromApi: false,
+        errorMessage: errorMessage || '알 수 없는 오류',
+      })
+    }
+
+    ;(async () => {
+      const plan = loadActiveTripPlan()
+      const contextInput = buildContextInputFromPlan(plan)
+      const isPlaceholderTrip = String(tripId) === PLACEHOLDER_TRIP_ID
+
+      // [fast path] 새 여행 플로우(placeholder tripId) + 로컬 플랜이 갖춰진 경우
+      // 곧바로 context 엔드포인트를 쓴다. 존재하지 않는 Trip 1 조회를 생략해 백엔드 WARN 로그도 없어진다.
+      if (isPlaceholderTrip && contextInput) {
+        try {
+          const data = await generateChecklistFromContext(contextInput)
+          applyAdapted(data, 'context')
+          return
+        } catch (err) {
+          if (cancelled) return
+          console.warn(
+            '[TripSearchPage] generateFromContext (fast path) 실패, 목데이터로 폴백:',
+            err?.message ?? err,
+          )
+          applyFallback(err?.response?.data?.message || err?.message)
+          return
+        }
+      }
+
+      // [정상 경로] 실제 DB trip 이 있을 때: tripId 엔드포인트 시도 → 실패 시 context 로 재시도.
+      try {
+        const data = await generateChecklist(tripId)
+        applyAdapted(data, 'trip')
+        return
+      } catch (err1) {
+        const status = err1?.response?.status
+        if (cancelled) return
+        if (status === 404 || status === 400) {
+          if (contextInput) {
+            try {
+              const data2 = await generateChecklistFromContext(contextInput)
+              applyAdapted(data2, 'context')
+              return
+            } catch (err2) {
+              if (cancelled) return
+              console.warn(
+                '[TripSearchPage] generateFromContext 실패, 목데이터로 폴백:',
+                err2?.message ?? err2,
+              )
+            }
+          } else {
+            console.warn(
+              '[TripSearchPage] trip 없음 + 로컬 플랜도 없어 context 재시도 불가 — 목데이터 폴백',
+            )
+          }
+        } else {
+          console.warn('[TripSearchPage] generateChecklist 실패, 목데이터로 폴백:', err1?.message ?? err1)
+        }
+        applyFallback(err1?.response?.data?.message || err1?.message)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [tripId])
   const handleBaggageChange = (baggage) => {
     if (baggage !== selectedBaggage) {
       trackEvent('search_baggage_change', {
@@ -150,6 +299,10 @@ function TripSearchInner({ tripId }) {
     }
     setSelectedCategory(category)
   }
+
+  /** 현재 렌더링 기준이 되는 데이터 소스: API 성공 시 실데이터, 아니면 목데이터 */
+  const sourceItems = loadState.fromApi ? apiItems : MOCK_ITEMS
+  const tabCategories = loadState.fromApi ? getTabCategories() : CATEGORIES
 
   const toggleItemSelect = (item) => {
     const id = String(item.id)
@@ -175,9 +328,30 @@ function TripSearchInner({ tripId }) {
 
   const closeSaveConfirmModal = () => setSaveConfirmModalOpen(false)
 
+  /**
+   * 백엔드 ChecklistItem 에 is_selected=true 를 마크한다 (fire-and-forget).
+   *   - localStorage 저장 결과가 진실(source of truth) 이고, 이 호출은 교차기기/분석용으로만 사용.
+   *   - API 실패해도 사용자 플로우는 계속되며 콘솔에만 경고를 남긴다.
+   *   - serverId 가 없는 항목(목데이터 fallback, context 기반 생성 등) 은 호출을 건너뛴다.
+   */
+  const markItemsSelectedOnServer = (items) => {
+    const ids = items
+      .map((i) => i.serverId)
+      .filter((id) => id && String(id).trim())
+    if (ids.length === 0) return
+    ids.forEach((serverId) => {
+      selectChecklistItem(serverId).catch((err) => {
+        console.warn(
+          `[TripSearchPage] selectChecklistItem(${serverId}) 실패 — localStorage 저장은 완료:`,
+          err?.response?.data?.message || err?.message || err,
+        )
+      })
+    })
+  }
+
   /** 확인 모달에서만 실행: 체크리스트 저장 + 가이드 보관함 스냅샷 후 이동 (또는 기존 엔트리에 항목 병합) */
   const handleConfirmSaveAndGoArchive = () => {
-    const itemsToSave = MOCK_ITEMS.filter((i) => selectedForSave.has(String(i.id)))
+    const itemsToSave = sourceItems.filter((i) => selectedForSave.has(String(i.id)))
     if (itemsToSave.length === 0) {
       closeSaveConfirmModal()
       return
@@ -186,11 +360,14 @@ function TripSearchInner({ tripId }) {
     if (mergeToArchive) {
       const existing = archiveEntry.items ?? []
       const existingIds = new Set(existing.map((i) => String(i.id)))
-      const additions = itemsToSave.filter((i) => !existingIds.has(String(i.id))).map(mapMockItemToArchiveItem)
+      const selectedSources = itemsToSave.filter((i) => !existingIds.has(String(i.id)))
+      const additions = selectedSources.map(mapMockItemToArchiveItem)
       if (additions.length === 0) {
         closeSaveConfirmModal()
         return
       }
+      // 서버 측 is_selected 플래그도 병행 갱신 (fire-and-forget, localStorage 가 진실값).
+      markItemsSelectedOnServer(selectedSources)
       const merged = [...existing, ...additions]
       patchGuideArchiveEntry(tripId, archiveEntryId, { items: merged })
 
@@ -243,6 +420,9 @@ function TripSearchInner({ tripId }) {
       return
     }
 
+    // 서버 측 is_selected 플래그도 병행 갱신 (fire-and-forget, localStorage 가 진실값).
+    markItemsSelectedOnServer(itemsToSave)
+
     itemsToSave.forEach((item) => {
       if (savedIds.has(String(item.id))) return
       saveItemForTrip(tripId, {
@@ -290,6 +470,8 @@ function TripSearchInner({ tripId }) {
       phaseHints: TRIP_SEARCH_CONTEXT.phaseHints.map((p) => ({ ...p })),
       items: itemsToSave.map((i) => ({
         id: i.id,
+        // 서버 ChecklistItem.id 를 함께 저장해야 보관함에서 삭제 시 deselect 호출이 가능하다.
+        serverId: i.serverId ?? null,
         baggageType: i.baggageType,
         category: i.category,
         categoryLabel: i.categoryLabel,
@@ -328,11 +510,13 @@ function TripSearchInner({ tripId }) {
 
   const handleModalBack = () => setLeaveModalOpen(false)
 
+  const totalItemCount = sourceItems.length
+  const aiRecommendCount = sourceItems.filter((i) => i.category === 'ai_recommend').length
   /** 선택한 수하물 구간(전체 | 기내 | 위탁)에 해당하는 목록만 */
   const baggageFilteredItems = useMemo(() => {
-    if (selectedBaggage === BAGGAGE_FILTER_ALL) return MOCK_ITEMS
-    return MOCK_ITEMS.filter((i) => resolveBaggageSection(i) === selectedBaggage)
-  }, [selectedBaggage])
+    if (selectedBaggage === BAGGAGE_FILTER_ALL) return sourceItems
+    return sourceItems.filter((i) => resolveBaggageSection(i) === selectedBaggage)
+  }, [selectedBaggage, sourceItems])
 
   /** 목록에 표시할 수하물 구간 순서(전체 필터면 기내 → 위탁, 아니면 선택 한 구간만) */
   const baggageSectionKeys = useMemo(() => {
@@ -420,9 +604,9 @@ function TripSearchInner({ tripId }) {
 
   /** 「전체」 탭 — 섹션(카테고리) 단위 전체 선택/해제 */
   const selectionProgressPercent = useMemo(() => {
-    if (MOCK_ITEMS.length === 0) return 0
-    return Math.min(100, Math.round((selectedForSave.size / MOCK_ITEMS.length) * 100))
-  }, [selectedForSave.size])
+    if (sourceItems.length === 0) return 0
+    return Math.min(100, Math.round((selectedForSave.size / sourceItems.length) * 100))
+  }, [selectedForSave.size, sourceItems.length])
 
   const handleToggleSelectAllInGroup = (group) => {
     const selectable = group.items.filter((i) => !existingArchiveItemIds.has(String(i.id)))
@@ -496,6 +680,25 @@ function TripSearchInner({ tripId }) {
               연결된 체크리스트를 찾을 수 없어 일반 검색으로 표시합니다. 보관함에서 다시 들어와 주세요.
             </p>
           ) : null}
+          {loadState.status === 'fallback' ? (
+            <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+              맞춤 추천 데이터를 불러오지 못했습니다. 임시로 예시 데이터를 표시합니다. (서버 연결·로그인 상태를 확인해 주세요)
+            </p>
+          ) : null}
+          {loadState.status === 'ready' && apiSummary ? (
+            <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-slate-600 md:text-sm">
+              <span className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 font-semibold text-violet-800">
+                <AiSparkleMaskIcon selected={false} className="h-3.5 w-3.5" />
+                AI 맞춤 추천 <span className="tabular-nums">{aiRecommendCount}</span>개
+              </span>
+              <span className="inline-flex items-center rounded-full border border-cyan-200 bg-cyan-50 px-2.5 py-1 font-semibold text-cyan-800">
+                카테고리 필수품 <span className="ml-1 tabular-nums">{Math.max(0, totalItemCount - aiRecommendCount)}</span>개
+              </span>
+              {apiSummary.model ? (
+                <span className="text-[11px] text-slate-400 md:text-xs">모델 {apiSummary.model}</span>
+              ) : null}
+            </div>
+          ) : null}
         </header>
 
         <div className="sticky top-0 z-20 -mx-5 mb-6 border-b border-slate-100/90 bg-white px-5 py-3 backdrop-blur-sm md:static md:mx-0 md:rounded-xl md:border md:border-slate-100 md:bg-white md:px-5 md:py-4 md:shadow-sm">
@@ -504,7 +707,7 @@ function TripSearchInner({ tripId }) {
               {mergeToArchive ? '추가 선택' : '담기 선택'}{' '}
               <span className="tabular-nums text-slate-800">{selectedForSave.size}</span>
               {' / '}
-              <span className="tabular-nums text-slate-800">{MOCK_ITEMS.length}</span>
+              <span className="tabular-nums text-slate-800">{totalItemCount}</span>
             </span>
             <span className="tabular-nums text-slate-800">{selectionProgressPercent}%</span>
           </div>
@@ -553,7 +756,7 @@ function TripSearchInner({ tripId }) {
             role="tablist"
             aria-labelledby="search-subcategory-label"
           >
-            {CATEGORIES.map((cat) => {
+            {tabCategories.map((cat) => {
               const isAi = cat.value === 'ai_recommend'
               const selected = selectedCategory === cat.value
               const tabClass = isAi
@@ -580,6 +783,18 @@ function TripSearchInner({ tripId }) {
           </div>
         </section>
 
+        <p className="mb-3 text-sm font-semibold text-gray-700 md:text-base">
+          {mergeToArchive ? (
+            <>
+              추가 후보 <span className="tabular-nums">{totalItemCount}</span>개
+            </>
+          ) : (
+            <>
+              총 검색 결과 <span className="tabular-nums">{totalItemCount}</span>개
+            </>
+          )}
+        </p>
+
         <div className="mb-6 flex w-full max-w-full flex-wrap items-center gap-x-3 gap-y-3">
           <p className="min-w-0 flex-1 text-sm font-semibold text-gray-700 md:text-base">
             <span className="text-teal-900">
@@ -589,7 +804,9 @@ function TripSearchInner({ tripId }) {
               ·
             </span>
             <span className="text-slate-700">
-              {selectedCategory === 'all' ? '전체 유형' : CATEGORIES.find((c) => c.value === selectedCategory)?.label}
+              {selectedCategory === 'all'
+                ? '전체 유형'
+                : tabCategories.find((c) => c.value === selectedCategory)?.label}
             </span>
             <span className="ml-1.5 tabular-nums text-gray-900">{visibleItemCount}</span>개
           </p>
@@ -605,7 +822,20 @@ function TripSearchInner({ tripId }) {
         </div>
 
         <section aria-label="준비물 목록">
-          {selectedCategory === 'all' ? (
+          {loadState.status === 'loading' ? (
+            <div className="flex flex-col gap-3">
+              {Array.from({ length: 6 }).map((_, idx) => (
+                <div
+                  key={idx}
+                  className="h-20 animate-pulse rounded-2xl border-2 border-gray-100 bg-white/80 shadow-sm"
+                  aria-hidden
+                />
+              ))}
+              <p className="mt-2 text-center text-sm text-gray-500">
+                AI 맞춤 추천과 카테고리별 필수품을 준비 중입니다…
+              </p>
+            </div>
+          ) : selectedCategory === 'all' ? (
             <div className="space-y-10">
               {groupedItemsByBaggage.length === 0 ? (
                 <div className="rounded-2xl border border-gray-100 bg-white py-16 text-center text-sm text-gray-500 shadow-sm">
@@ -707,7 +937,7 @@ function TripSearchInner({ tripId }) {
                             {selectedCategory === 'ai_recommend' ? (
                               <AiSparkleMaskIcon selected={false} className="h-4 w-4 shrink-0" />
                             ) : null}
-                            {CATEGORIES.find((c) => c.value === selectedCategory)?.label ?? '준비물'}
+                            {tabCategories.find((c) => c.value === selectedCategory)?.label ?? '준비물'}
                           </h3>
                         </div>
                         <div className="flex flex-col gap-3">

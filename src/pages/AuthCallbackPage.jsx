@@ -26,18 +26,33 @@ const ONBOARDING_MOCK_SUB_KEY = (provider) => `checkmate:mock_oauth_sub:${provid
 
 export default function AuthCallbackPage() {
   const navigate = useNavigate()
+  // StrictMode(dev) 이중 호출 가드용 ref.
+  // 주의: 예전에는 여기에 `let alive` 플래그를 함께 썼는데,
+  //       StrictMode 에서 cleanup 이 먼저 `alive=false` 로 만든 뒤 두 번째 effect 가 `ranRef` 때문에 바로 return 하면
+  //       첫 async 작업은 `!alive` 가드에 막혀 상태 업데이트를 못 하고 **영원히 로딩** 되는 문제가 있었다.
+  //       → ref 기반 "취소" 플래그로 교체. cleanup 에서만 true 로 set, 두 번째 mount 에서는 다시 false 로 reset.
   const ranRef = useRef(false)
+  const cancelledRef = useRef(false)
   const [status, setStatus] = useState('processing')
   const [errorMessage, setErrorMessage] = useState('')
 
   useEffect(() => {
+    cancelledRef.current = false
     if (ranRef.current) return
     ranRef.current = true
 
-    let alive = true
     ;(async () => {
-      const result = await consumeAuthCallback()
-      if (!alive) return
+      let result
+      try {
+        result = await consumeAuthCallback()
+      } catch (err) {
+        if (cancelledRef.current) return
+        if (import.meta.env.DEV) console.error('[auth/callback] consumeAuthCallback threw', err)
+        setStatus('error')
+        setErrorMessage(err?.message || '로그인 처리 중 알 수 없는 오류가 발생했습니다.')
+        return
+      }
+      if (cancelledRef.current) return
 
       if (!result.ok) {
         setStatus('error')
@@ -52,7 +67,6 @@ export default function AuthCallbackPage() {
       try {
         if (sub) localStorage.setItem(ONBOARDING_MOCK_SUB_KEY(provider), sub)
         sessionStorage.setItem(SESSION_LAST_SOCIAL_PROVIDER, provider)
-        // URL hash 정리 (토큰 노출 방지)
         if (window.location.hash) {
           window.history.replaceState(null, '', window.location.pathname + window.location.search)
         }
@@ -65,7 +79,7 @@ export default function AuthCallbackPage() {
     })()
 
     return () => {
-      alive = false
+      cancelledRef.current = true
     }
   }, [navigate])
 

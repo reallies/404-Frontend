@@ -52,7 +52,10 @@ async function startSupabaseOAuth(provider, opts) {
 
 /**
  * /auth/callback 에서 호출:
- * - Supabase 클라이언트는 `detectSessionInUrl: true` 로 세션을 자동 생성하므로 `getSession()` 만 읽으면 된다.
+ * - Supabase 클라이언트는 `detectSessionInUrl: true` 로 URL 해시를 비동기 파싱해 세션을 세팅한다.
+ * - 다만 `createClient()` 직후 `getSession()` 이 호출되는 경우, 해시 파싱이 아직 끝나지 않아
+ *   **일시적으로 null** 이 반환되어 `no_session` 오류로 폴백하는 레이스가 있다.
+ *   → `onAuthStateChange` (SIGNED_IN) 를 같이 대기 + 짧은 타임아웃으로 안전하게 세션을 획득한다.
  *
  * @returns {Promise<{ ok: true, provider: 'google'|'kakao', sub: string } | { ok: false, error: string }>}
  */
@@ -66,27 +69,80 @@ export async function consumeAuthCallback() {
   }
 
   const supabase = getSupabaseClient()
-  if (supabase) {
+  if (!supabase) {
+    return { ok: false, error: 'no_session' }
+  }
+
+  // `detectSessionInUrl` 파싱 race 대응: 이미 세션이 있으면 즉시, 없으면 SIGNED_IN 이벤트를 잠시 대기.
+  const hasCallbackHash = Boolean(
+    hashParams.access_token || hashParams.refresh_token || hashParams.code,
+  )
+  const session = await waitForSession(supabase, {
+    timeoutMs: hasCallbackHash ? 5000 : 500,
+  })
+
+  if (!session?.access_token) {
+    return { ok: false, error: 'no_session' }
+  }
+
+  const provider =
+    session.user?.app_metadata?.provider === 'kakao'
+      ? 'kakao'
+      : session.user?.app_metadata?.provider === 'google'
+        ? 'google'
+        : null
+  try {
+    localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, session.access_token)
+    if (provider) localStorage.setItem(AUTH_PROVIDER_STORAGE_KEY, provider)
+  } catch {
+    /* ignore */
+  }
+  return { ok: true, provider: provider ?? 'google', sub: session.user?.id ?? '' }
+}
+
+/**
+ * 현재 세션을 기다린다. 이미 존재하면 즉시 반환, 없으면 `onAuthStateChange` 로 SIGNED_IN 을 대기하고
+ * 타임아웃이 지나면 한 번 더 `getSession()` 을 확인한 뒤 null.
+ *
+ * @param {ReturnType<typeof getSupabaseClient>} supabase
+ * @param {{ timeoutMs: number }} opts
+ */
+async function waitForSession(supabase, { timeoutMs }) {
+  try {
     const { data } = await supabase.auth.getSession()
-    const session = data?.session
-    if (session?.access_token) {
-      const provider =
-        session.user?.app_metadata?.provider === 'kakao'
-          ? 'kakao'
-          : session.user?.app_metadata?.provider === 'google'
-            ? 'google'
-            : null
+    if (data?.session?.access_token) return data.session
+  } catch {
+    /* fall through */
+  }
+
+  return await new Promise((resolve) => {
+    let settled = false
+    const done = (val) => {
+      if (settled) return
+      settled = true
       try {
-        localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, session.access_token)
-        if (provider) localStorage.setItem(AUTH_PROVIDER_STORAGE_KEY, provider)
+        sub?.subscription?.unsubscribe?.()
       } catch {
         /* ignore */
       }
-      return { ok: true, provider: provider ?? 'google', sub: session.user?.id ?? '' }
+      clearTimeout(timer)
+      resolve(val)
     }
-  }
 
-  return { ok: false, error: 'no_session' }
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session?.access_token) done(session)
+      else if (event === 'SIGNED_OUT') done(null)
+    })
+
+    const timer = setTimeout(async () => {
+      try {
+        const { data } = await supabase.auth.getSession()
+        done(data?.session ?? null)
+      } catch {
+        done(null)
+      }
+    }, timeoutMs)
+  })
 }
 
 // ------------------------------------------------------------------
