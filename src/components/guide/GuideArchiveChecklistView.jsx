@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   DndContext,
@@ -180,6 +180,7 @@ export default function GuideArchiveChecklistView({ tripId, entry, onArchiveMuta
   useEffect(() => {
     setLocalItems(entry.items ?? [])
   }, [entryOrderSignature])
+  const reclassificationAttemptedRef = useRef(new Set())
 
   const reclassificationCandidatesSignature = useMemo(() => {
     return (localItems ?? [])
@@ -188,12 +189,16 @@ export default function GuideArchiveChecklistView({ tripId, entry, onArchiveMuta
         if (!baseCategory || baseCategory === GUIDE_USER_DIRECT_CATEGORY) return false
         return !String(it?.refinedCategory ?? '').trim()
       })
-      .map((it) => `${String(it.id)}::${String(it.title ?? '')}::${String(it.category ?? '')}`)
+      .map((it) => String(it.id))
+      .sort((a, b) => a.localeCompare(b))
       .join('|')
   }, [localItems])
 
   useEffect(() => {
     if (!reclassificationCandidatesSignature) return
+    const requestKey = `${String(tripId)}:${String(entry.id)}:${reclassificationCandidatesSignature}`
+    if (reclassificationAttemptedRef.current.has(requestKey)) return
+    reclassificationAttemptedRef.current.add(requestKey)
     const candidates = (localItems ?? []).filter((it) => {
       const baseCategory = String(it?.category ?? '')
       if (!baseCategory || baseCategory === GUIDE_USER_DIRECT_CATEGORY) return false
