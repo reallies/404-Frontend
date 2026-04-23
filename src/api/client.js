@@ -12,7 +12,8 @@ import { getSupabaseClient } from '@/lib/supabase'
 export const AUTH_TOKEN_STORAGE_KEY = 'checkmate:auth_token'
 export const AUTH_PROVIDER_STORAGE_KEY = 'checkmate:auth_provider'
 
-const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api'
+const baseURL = import.meta.env.VITE_API_BASE_URL
+if (!baseURL) throw new Error('VITE_API_BASE_URL is required at build time')
 
 export const apiClient = axios.create({
   baseURL,
