@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
   STEP5_CONFIG,
@@ -17,6 +17,7 @@ import {
 } from '@/components/trip/TripNewFlowPrevControls'
 import { TripFlowNextStepButton } from '@/components/trip/TripFlowNextStepButton'
 import { loadActiveTripPlan, saveActiveTripPlan } from '@/utils/tripPlanContextStorage'
+import { listCompanionTypes, listTravelStyles } from '@/api/master'
 import { buildCreateTripPayload } from '@/utils/tripPlanToCreatePayload'
 import { saveActiveTripId, clearActiveTripId } from '@/utils/activeTripIdStorage'
 import { createTrip } from '@/api/trips'
@@ -84,6 +85,27 @@ export default function TripNewStep5Page() {
   /** Trip 생성 POST 진행 상태 — 버튼 중복 클릭 방지 + 인라인 에러 표시용 */
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
+  const [companions, setCompanions] = useState(COMPANIONS)
+  const [travelStyles, setTravelStyles] = useState(TRAVEL_STYLES)
+
+  useEffect(() => {
+    let cancelled = false
+    Promise.all([listCompanionTypes(), listTravelStyles()])
+      .then(([apiCompanions, apiStyles]) => {
+        if (cancelled) return
+        setCompanions(
+          apiCompanions.map((c) => {
+            const mock = COMPANIONS.find((m) => m.id === c.code)
+            return { id: c.code, label: c.labelKo, description: mock?.description ?? '', icon: mock?.icon ?? 'person' }
+          })
+        )
+        setTravelStyles(
+          apiStyles.map((s) => ({ id: s.code, label: s.labelKo, iconSrc: s.iconPath }))
+        )
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
 
   const toggleStyle = useCallback((id) => {
     setStyleIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
@@ -101,8 +123,8 @@ export default function TripNewStep5Page() {
     // 백엔드 맞춤 체크리스트 호출(/checklists/generate-from-context) fallback 경로 및
     // Trip 생성 payload 생성을 위해, 동행·여행 스타일 라벨을 플랜 스토리지에 합쳐 둔다.
     const existingPlan = loadActiveTripPlan()
-    const companionLabel = COMPANIONS.find((c) => c.id === companionId)?.label ?? null
-    const travelStyleLabels = TRAVEL_STYLES.filter((s) => styleIds.includes(s.id)).map((s) => s.label)
+    const companionLabel = companions.find((c) => c.id === companionId)?.label ?? null
+    const travelStyleLabels = travelStyles.filter((s) => styleIds.includes(s.id)).map((s) => s.label)
     const hasPet = companionId === 'withPet'
     const nextPlan = existingPlan?.destination
       ? {
@@ -221,7 +243,7 @@ export default function TripNewStep5Page() {
               <p className="text-sm text-gray-500 mb-5">누구와 함께 여행하시나요?</p>
               <div className="flex-1 min-h-0">
                 <div className="grid grid-cols-2 gap-3 auto-rows-fr">
-                  {COMPANIONS.map((c) => (
+                  {companions.map((c) => (
                     <button
                       key={c.id}
                       type="button"
@@ -273,7 +295,7 @@ export default function TripNewStep5Page() {
               <p className="text-sm text-gray-500 mb-5">어떤 여행을 계획하고 있나요? (복수 선택 가능)</p>
 
               <div className="grid w-full grid-cols-3 grid-rows-3 gap-3 min-h-[320px] md:min-h-[400px] md:gap-4">
-                {TRAVEL_STYLES.map((s) => (
+                {travelStyles.map((s) => (
                   <button
                     key={s.id}
                     type="button"
@@ -335,7 +357,7 @@ export default function TripNewStep5Page() {
           <SectionLabel num={1} label="동행인 선택" />
           <p className="text-sm text-gray-500 mb-4">누구와 함께 여행하시나요?</p>
           <div className="grid grid-cols-2 gap-3 mb-8">
-            {COMPANIONS.map((c) => (
+            {companions.map((c) => (
               <button
                 key={c.id}
                 type="button"
@@ -356,7 +378,7 @@ export default function TripNewStep5Page() {
 
           <SectionLabel num={2} label="여행 스타일" />
           <div className="grid grid-cols-2 gap-3 min-h-[420px] auto-rows-fr">
-            {TRAVEL_STYLES.map((s) => (
+            {travelStyles.map((s) => (
               <button
                 key={s.id}
                 type="button"

@@ -4,12 +4,12 @@ import {
   STEP_DESTINATION_CONFIG,
   COUNTRY_ARRIVAL_OPTIONS,
   MOBILE_QUICK_DESTINATION_CHIPS,
-  filterCountriesByQuery,
   filterArrivalsByQuery,
   getArrivalsForCountry,
   sanitizeCountryInput,
   sanitizeArrivalInput,
 } from '@/mocks/tripNewDestinationData'
+import { listCountries, listCities } from '@/api/master'
 import StepHeader from '@/components/common/StepHeader'
 import { TripFlowNextStepButton } from '@/components/trip/TripFlowNextStepButton'
 import {
@@ -34,14 +34,42 @@ function getLocalDateYYYYMMDD() {
   return `${y}-${m}-${day}`
 }
 
+/** API 응답(countries + cities)을 COUNTRY_ARRIVAL_OPTIONS 형태로 변환 */
+function buildCountryArrivalOptions(countries, cities) {
+  const citiesByCountryId = {}
+  for (const city of cities) {
+    const key = String(city.countryId)
+    if (!citiesByCountryId[key]) citiesByCountryId[key] = []
+    citiesByCountryId[key].push(city)
+  }
+  return countries.map((country) => {
+    const mockEntry = COUNTRY_ARRIVAL_OPTIONS.find((m) => m.countryCode === country.code)
+    const countryCities = (citiesByCountryId[String(country.id)] ?? []).filter((c) => c.iataCode)
+    const primaryCity = countryCities[0]
+    return {
+      name: country.nameKo,
+      aliases: mockEntry?.aliases ?? [],
+      iata: primaryCity?.iataCode ?? mockEntry?.iata ?? '',
+      city: primaryCity?.nameKo ?? mockEntry?.city ?? '',
+      country: country.nameKo,
+      countryCode: country.code,
+      arrivals: countryCities.map((c) => ({
+        city: c.nameKo,
+        iata: c.iataCode,
+        aliases: mockEntry?.arrivals?.find((a) => a.iata === c.iataCode)?.aliases ?? [],
+      })),
+    }
+  })
+}
+
 /** 엔터·정확 일치용: 목록에서 국가명 또는 별칭과 일치하는 항목 */
-function findExactCountryMatch(trimmedQuery) {
+function findExactCountryMatch(trimmedQuery, list) {
   const q = trimmedQuery
   if (!q) return null
   const lower = q.toLowerCase()
   return (
-    COUNTRY_ARRIVAL_OPTIONS.find((c) => c.name === q) ||
-    COUNTRY_ARRIVAL_OPTIONS.find((c) => c.aliases?.some((a) => a.toLowerCase() === lower)) ||
+    list.find((c) => c.name === q) ||
+    list.find((c) => c.aliases?.some((a) => a.toLowerCase() === lower)) ||
     null
   )
 }
@@ -95,6 +123,7 @@ function DestinationDateForm({
   onScheduleModeChange,
   flexibilityDays,
   onFlexibilityDaysChange,
+  allCountries,
 }) {
   const hasQuery = countryQuery.trim().length > 0
   const panelOpen = showDropdown && (pickerPhase === 'arrival' || hasQuery)
@@ -136,7 +165,7 @@ function DestinationDateForm({
               key={chip.label}
               type="button"
               onClick={() => {
-                const c = COUNTRY_ARRIVAL_OPTIONS.find((x) => x.name === chip.countryName)
+                const c = allCountries.find((x) => x.name === chip.countryName)
                 if (c) onPickCountry(c)
               }}
               className="rounded-full border border-sky-200/90 bg-white px-3 py-1.5 text-sm font-semibold text-sky-800 shadow-sm transition hover:border-sky-300/90 hover:bg-sky-50/80"
@@ -243,6 +272,18 @@ export default function TripNewDestinationPage() {
   const [endDate, setEndDate] = useState('')
   const [dateScheduleMode, setDateScheduleMode] = useState('fixed')
   const [dateFlexibilityDays, setDateFlexibilityDays] = useState(0)
+  const [countryOptions, setCountryOptions] = useState(COUNTRY_ARRIVAL_OPTIONS)
+
+  useEffect(() => {
+    let cancelled = false
+    Promise.all([listCountries(), listCities({ onlyServed: true })])
+      .then(([countries, cities]) => {
+        if (cancelled) return
+        setCountryOptions(buildCountryArrivalOptions(countries, cities))
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
 
   /** 자정 등으로 today가 바뀌면 과거로 밀린 값은 비움 */
   useEffect(() => {
@@ -250,7 +291,15 @@ export default function TripNewDestinationPage() {
     setEndDate((prev) => (prev && prev < today ? '' : prev))
   }, [today])
 
-  const suggestions = useMemo(() => filterCountriesByQuery(countryQuery), [countryQuery])
+  const suggestions = useMemo(() => {
+    const q = countryQuery.trim()
+    if (!q) return []
+    return countryOptions.filter((c) => {
+      if (c.name.includes(q)) return true
+      if (c.aliases?.some((a) => a.includes(q))) return true
+      return false
+    }).slice(0, 14)
+  }, [countryQuery, countryOptions])
 
   const arrivalSuggestions = useMemo(() => {
     if (pickerPhase !== 'arrival' || !draftCountry) return []
@@ -345,13 +394,18 @@ export default function TripNewDestinationPage() {
     const trimmed = countryQuery.trim()
     if (!trimmed) return
 
-    const exact = findExactCountryMatch(trimmed)
+    const exact = findExactCountryMatch(trimmed, countryOptions)
     if (exact) {
       handlePickCountryFromList(exact)
       return
     }
 
-    const list = filterCountriesByQuery(countryQuery)
+    const q = countryQuery.trim()
+    const list = countryOptions.filter((c) => {
+      if (c.name.includes(q)) return true
+      if (c.aliases?.some((a) => a.includes(q))) return true
+      return false
+    })
     if (list.length === 1) {
       handlePickCountryFromList(list[0])
       return
@@ -460,6 +514,7 @@ export default function TripNewDestinationPage() {
     onScheduleModeChange: setDateScheduleMode,
     flexibilityDays: dateFlexibilityDays,
     onFlexibilityDaysChange: setDateFlexibilityDays,
+    allCountries: countryOptions,
   }
 
   return (
@@ -538,7 +593,7 @@ export default function TripNewDestinationPage() {
                   key={chip.label}
                   type="button"
                   onClick={() => {
-                    const c = COUNTRY_ARRIVAL_OPTIONS.find((x) => x.name === chip.countryName)
+                    const c = countryOptions.find((x) => x.name === chip.countryName)
                     if (c) handlePickCountryFromList(c)
                   }}
                   className="rounded-full border border-sky-200/90 bg-white px-3 py-1.5 text-xs font-semibold text-sky-800 shadow-sm transition active:scale-[0.98]"

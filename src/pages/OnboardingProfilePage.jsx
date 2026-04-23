@@ -11,6 +11,7 @@ import {
   getOnboardingEntryRedirect,
   markOnboardingComplete,
 } from '@/utils/onboardingGate'
+import { updateMyProfile } from '@/api/users'
 
 /** 온보딩 마지막「체크메이트 시작하기」 */
 const ONBOARDING_FINISH_BTN_CLASS =
@@ -79,14 +80,9 @@ export default function OnboardingProfilePage() {
 
   const completeOnboarding = useCallback(() => {
     if (!canFinish) return
-    // TODO: API `PATCH /users/me` 또는 Supabase 등
-    const profilePayload = {
-      gender,
-      dateOfBirth: birthDate,
-    }
-    void profilePayload
     const sub = getActiveOnboardingSubject()
     if (sub) markOnboardingComplete(sub)
+    updateMyProfile({ gender, birthDate }).catch(() => {})
     setFinishModalOpen(false)
     navigate('/', { replace: true })
   }, [birthDate, canFinish, gender, navigate])

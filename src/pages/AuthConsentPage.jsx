@@ -11,6 +11,7 @@ import {
   markLegalConsentAccepted,
   SESSION_LAST_SOCIAL_PROVIDER,
 } from '@/utils/onboardingGate'
+import { acceptLegalConsent } from '@/api/users'
 
 /**
  * 소셜 로그인 직후 — 이용약관·개인정보 동의 (필수) 후 홈 또는(온보딩 켜짐 시) 프로필 온보딩으로 이동.
@@ -42,6 +43,7 @@ export default function AuthConsentPage() {
       return
     }
     markLegalConsentAccepted(sub, { marketingOptIn: Boolean(marketingOptIn) })
+    acceptLegalConsent({ marketingOptIn: Boolean(marketingOptIn) }).catch(() => {})
     navigate(FEATURE_PROFILE_ONBOARDING_ENABLED ? '/onboarding' : '/', { replace: true })
   }, [navigate])
 
