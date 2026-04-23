@@ -5,11 +5,9 @@ import featureMascotQuestionUrl from '@/assets/home-feature-mascot-question.png'
 import processCardSaveUrl from '@/assets/home-process-card-save.png'
 import processCardOpenUrl from '@/assets/home-process-card-open.png'
 import processCardCheckUrl from '@/assets/home-process-card-check.png'
-import ctaMascotLuggageUrl from '@/assets/home-cta-mascot-luggage.png'
-import ctaFlagPawnUrl from '@/assets/home-cta-flag-pawn.png'
+import ctaSceneUrl from '@/assets/home-cta-scene.png'
 import ctaWordMateUrl from '@/assets/home-cta-word-mate.png'
 import ctaWordCheckUrl from '@/assets/home-cta-word-check.png'
-import ctaFloorCheckerboardUrl from '@/assets/home-cta-floor-checkerboard.png'
 import BrandLogo from '@/components/common/BrandLogo'
 import { useRevealOnScrollOnce } from '@/hooks/useRevealOnScrollOnce'
 import {
@@ -541,32 +539,14 @@ function HomePage() {
             <RevealBlock
               show={ctaRevealed}
               delayClass="delay-[200ms]"
-              className="relative mt-5 h-[220px] md:mt-8 md:h-[360px]"
+              className="relative mt-5 flex justify-center md:mt-8"
             >
-              <div
-                className="pointer-events-none absolute bottom-8 left-1/2 h-[118px] w-full -translate-x-1/2 overflow-hidden md:bottom-12 md:h-[182px]"
-                style={{ clipPath: 'polygon(35% 38%, 65% 38%, 100% 100%, 0 100%)' }}
-                aria-hidden
-              >
-                <img
-                  src={ctaFloorCheckerboardUrl}
-                  alt=""
-                  className="h-full w-full object-contain object-bottom object-center"
-                  loading="lazy"
-                  decoding="async"
-                />
-              </div>
               <img
-                src={ctaMascotLuggageUrl}
-                alt="여행 가방을 든 메이트 캐릭터"
-                className="absolute bottom-12 left-9 z-10 h-[142px] w-auto md:bottom-16 md:left-36 md:h-[290px]"
+                src={ctaSceneUrl}
+                alt="여행 가방을 든 메이트와 깃발을 든 작은 메이트가 체스판 위에 서 있는 장면"
+                className="mx-auto block h-auto w-full max-w-[560px] object-contain md:max-w-[960px] lg:max-w-[1120px]"
                 loading="lazy"
-              />
-              <img
-                src={ctaFlagPawnUrl}
-                alt="깃발을 든 작은 메이트 캐릭터"
-                className="absolute bottom-25 right-27 z-10 h-[92px] w-auto md:bottom-38.5 md:right-95.5 md:h-[172px]"
-                loading="lazy"
+                decoding="async"
               />
             </RevealBlock>
           </div>
