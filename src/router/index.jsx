@@ -1,26 +1,39 @@
+import { lazy, Suspense } from 'react'
 import { useRoutes, Navigate } from 'react-router-dom'
 
-import RootLayout from '@/layouts/RootLayout'
-import HomePage from '@/pages/HomePage'
-import LoginPage from '@/pages/LoginPage'
-import AuthConsentPage from '@/pages/AuthConsentPage'
-import AuthCallbackPage from '@/pages/AuthCallbackPage'
-import OnboardingProfilePage from '@/pages/OnboardingProfilePage'
+const RootLayout = lazy(() => import('@/layouts/RootLayout'))
+const HomePage = lazy(() => import('@/pages/HomePage'))
+const LoginPage = lazy(() => import('@/pages/LoginPage'))
+const AuthConsentPage = lazy(() => import('@/pages/AuthConsentPage'))
+const AuthCallbackPage = lazy(() => import('@/pages/AuthCallbackPage'))
+const OnboardingProfilePage = lazy(() => import('@/pages/OnboardingProfilePage'))
 /* 회원가입 UI 보관: 복구 시 아래 라우트를 SignupPage로 되돌리고 import 활성화 */
 // import SignupPage from '@/pages/SignupPage'
-import TripNewStep2Page from '@/pages/TripNewStep2Page'
-import TripNewDestinationPage from '@/pages/TripNewDestinationPage'
-import TripNewStep3Page from '@/pages/TripNewStep3Page'
-import TripNewStep4Page from '@/pages/TripNewStep4Page'
-import TripNewStep5Page from '@/pages/TripNewStep5Page'
-import TripLoadingPage from '@/pages/TripLoadingPage'
-import TripSearchPage from '@/pages/TripSearchPage'
-import TripGuideArchivePage from '@/pages/TripGuideArchivePage'
-import TripGuideArchiveDetailPage from '@/pages/TripGuideArchiveDetailPage'
-import NotFoundPage from '@/pages/NotFoundPage'
-import MyPage from '@/pages/MyPage'
-import ErrorPage from '@/pages/ErrorPage'
+const TripNewStep2Page = lazy(() => import('@/pages/TripNewStep2Page'))
+const TripNewDestinationPage = lazy(() => import('@/pages/TripNewDestinationPage'))
+const TripNewStep3Page = lazy(() => import('@/pages/TripNewStep3Page'))
+const TripNewStep4Page = lazy(() => import('@/pages/TripNewStep4Page'))
+const TripNewStep5Page = lazy(() => import('@/pages/TripNewStep5Page'))
+const TripLoadingPage = lazy(() => import('@/pages/TripLoadingPage'))
+const TripSearchPage = lazy(() => import('@/pages/TripSearchPage'))
+const TripGuideArchivePage = lazy(() => import('@/pages/TripGuideArchivePage'))
+const TripGuideArchiveDetailPage = lazy(() => import('@/pages/TripGuideArchiveDetailPage'))
+const NotFoundPage = lazy(() => import('@/pages/NotFoundPage'))
+const MyPage = lazy(() => import('@/pages/MyPage'))
+const ErrorPage = lazy(() => import('@/pages/ErrorPage'))
 import { FEATURE_PROFILE_ONBOARDING_ENABLED } from '@/utils/onboardingGate'
+
+function RouteFallback() {
+  return (
+    <div className="flex min-h-[40vh] items-center justify-center text-sm font-semibold text-slate-500">
+      페이지를 불러오는 중...
+    </div>
+  )
+}
+
+function withSuspense(element) {
+  return <Suspense fallback={<RouteFallback />}>{element}</Suspense>
+}
 
 /**
  * AppRoutes - useRoutes 기반 라우터 설정 (03_decision_log.md 기반)
@@ -45,38 +58,40 @@ const AppRoutes = () => {
   const routes = useRoutes([
     // Layout 적용 라우트
     {
-      element: <RootLayout />,
-      errorElement: <ErrorPage />,
+      element: withSuspense(<RootLayout />),
+      errorElement: withSuspense(<ErrorPage />),
       children: [
-        { path: '/',                    element: <HomePage /> },
-        { path: '/login',               element: <LoginPage /> },
-        { path: '/auth/consent',        element: <AuthConsentPage /> },
-        { path: '/auth/callback',       element: <AuthCallbackPage /> },
+        { path: '/',                    element: withSuspense(<HomePage />) },
+        { path: '/login',               element: withSuspense(<LoginPage />) },
+        { path: '/auth/consent',        element: withSuspense(<AuthConsentPage />) },
+        { path: '/auth/callback',       element: withSuspense(<AuthCallbackPage />) },
         {
           path: '/onboarding',
           element:
-            FEATURE_PROFILE_ONBOARDING_ENABLED ? <OnboardingProfilePage /> : <Navigate to="/" replace />,
+            FEATURE_PROFILE_ONBOARDING_ENABLED
+              ? withSuspense(<OnboardingProfilePage />)
+              : <Navigate to="/" replace />,
         },
         { path: '/signup',              element: <Navigate to="/login" replace /> },
-        { path: '/mypage',              element: <MyPage /> },
+        { path: '/mypage',              element: withSuspense(<MyPage />) },
         { path: '/trips/new',           element: <Navigate to="/trips/new/destination" replace /> },
         /** 보관: 예전 예매 분기 UI — 직접 URL로만 진입. 활성 플로우는 destination부터 */
-        { path: '/trips/new/step2',     element: <TripNewStep2Page /> },
-        { path: '/trips/new/destination', element: <TripNewDestinationPage /> },
+        { path: '/trips/new/step2',     element: withSuspense(<TripNewStep2Page />) },
+        { path: '/trips/new/destination', element: withSuspense(<TripNewDestinationPage />) },
         /** 보관: 항공편 입력 UI — 직접 URL로만 진입 */
-        { path: '/trips/new/step3',     element: <TripNewStep3Page /> },
+        { path: '/trips/new/step3',     element: withSuspense(<TripNewStep3Page />) },
         /** Step4: 이 경로는 TripNewStep4Page 단 하나만 사용 (중복 라우트 없음) */
-        { path: '/trips/new/step4',     element: <TripNewStep4Page /> },
-        { path: '/trips/new/step5',     element: <TripNewStep5Page /> },
-        { path: '/trips/:id/search',                  element: <TripSearchPage /> },
-        { path: '/trips/:id/guide-archive/:entryId',  element: <TripGuideArchiveDetailPage /> },
-        { path: '/trips/:id/guide-archive',           element: <TripGuideArchivePage /> },
-        { path: '/404',                 element: <NotFoundPage /> },
+        { path: '/trips/new/step4',     element: withSuspense(<TripNewStep4Page />) },
+        { path: '/trips/new/step5',     element: withSuspense(<TripNewStep5Page />) },
+        { path: '/trips/:id/search',                  element: withSuspense(<TripSearchPage />) },
+        { path: '/trips/:id/guide-archive/:entryId',  element: withSuspense(<TripGuideArchiveDetailPage />) },
+        { path: '/trips/:id/guide-archive',           element: withSuspense(<TripGuideArchivePage />) },
+        { path: '/404',                 element: withSuspense(<NotFoundPage />) },
       ],
     },
 
     // 로딩 페이지 - Header/Footer 없는 독립 풀스크린 (RootLayout 미적용)
-    { path: '/trips/:id/loading', element: <TripLoadingPage /> },
+    { path: '/trips/:id/loading', element: withSuspense(<TripLoadingPage />) },
 
     // Fallback - 정의되지 않은 URL → 404 페이지로 이동
     {
