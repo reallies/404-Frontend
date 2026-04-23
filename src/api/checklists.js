@@ -111,3 +111,25 @@ export async function getChecklistByTrip(tripId) {
   const res = await apiClient.get(`/checklists/by-trip/${tripId}`)
   return res.data
 }
+
+/**
+ * 가이드 보관함 상세 항목 재분류(2차 카테고리 분류).
+ *
+ * 백엔드 구현 전까지는 404/501 등이 날 수 있으므로
+ * 호출부에서 반드시 fallback 처리해야 한다.
+ *
+ * 권장 응답 shape:
+ * {
+ *   model?: string,
+ *   items: Array<{
+ *     id: string,
+ *     category: string,      // refinedCategory
+ *     subCategory?: string,  // refinedSubCategory
+ *     confidence?: number
+ *   }>
+ * }
+ */
+export async function reclassifyGuideArchiveItems(payload) {
+  const res = await apiClient.post('/checklists/reclassify-guide-archive', payload)
+  return res.data
+}

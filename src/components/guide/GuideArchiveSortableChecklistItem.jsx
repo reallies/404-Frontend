@@ -160,7 +160,7 @@ export default function GuideArchiveSortableChecklistItem({
       ref={setNodeRef}
       data-guide-archive-dnd-item={id}
       style={style}
-      className={`list-none transition-[opacity,filter] duration-200 ease-out ${
+      className={`relative list-none transition-[opacity,filter] duration-200 ease-out ${
         isDragging ? 'opacity-[0.38] saturate-75' : ''
       }`}
     >
@@ -175,7 +175,7 @@ export default function GuideArchiveSortableChecklistItem({
           aria-label="드래그하여 순서 변경"
           onPointerDown={stop}
           onClick={stop}
-          className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border touch-none select-none ${
+          className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border touch-none select-none md:absolute md:-left-10 md:top-1/2 md:-translate-y-1/2 ${
             sortableDisabled ? 'cursor-not-allowed opacity-40' : `cursor-grab active:cursor-grabbing ${gripBorder}`
           }`}
         >

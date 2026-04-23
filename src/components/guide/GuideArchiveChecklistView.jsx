@@ -17,7 +17,7 @@ import {
   setSavedItemChecked,
 } from '@/utils/savedTripItems'
 import { patchGuideArchiveEntry } from '@/utils/guideArchiveStorage'
-import { deselectChecklistItem } from '@/api/checklists'
+import { deselectChecklistItem, reclassifyGuideArchiveItems } from '@/api/checklists'
 import { buildGuideArchiveDateLine, buildGuideArchiveListTitle } from '@/utils/guideArchivePresentation'
 import { CATEGORIES } from '@/mocks/searchData'
 import GuideArchiveProgressBar from '@/components/guide/GuideArchiveProgressBar'
@@ -65,6 +65,33 @@ const GUIDE_BAGGAGE_TYPE_TABS = [
   { value: BAGGAGE_CARRY_ON, label: BAGGAGE_SECTION_LABEL[BAGGAGE_CARRY_ON] },
   { value: BAGGAGE_CHECKED, label: BAGGAGE_SECTION_LABEL[BAGGAGE_CHECKED] },
 ]
+const GUIDE_SUPPLIES_SUBSECTION_ORDER = [
+  'essentials',
+  'clothing',
+  'health',
+  'toiletries',
+  'beauty',
+  'electronics',
+  'travel_goods',
+]
+const GUIDE_SUPPLIES_SUBSECTION_LABEL = {
+  essentials: '필수 준비물',
+  clothing: '입을 옷',
+  health: '상비약',
+  toiletries: '세면도구',
+  beauty: '미용용품',
+  electronics: '전자제품',
+  travel_goods: '여행용품',
+}
+const GUIDE_SUPPLIES_ID_PREFIX_TO_SUBSECTION = {
+  doc: 'essentials',
+  clo: 'clothing',
+  hl: 'health',
+  pk: 'toiletries',
+  bty: 'beauty',
+  ele: 'electronics',
+  act: 'travel_goods',
+}
 
 /** 가이드 보관함 항목 유형 탭 — 탐색의 `CATEGORIES` 중 AI 전용 탭 제외(AI 추천은 백엔드에서 일반 카테고리로 귀속). */
 const GUIDE_ARCHIVE_SUPPLIES_CATEGORY_TABS = CATEGORIES.filter((c) => c.value !== 'ai_recommend')
@@ -72,6 +99,38 @@ const GUIDE_ARCHIVE_SUPPLIES_CATEGORY_TABS = CATEGORIES.filter((c) => c.value !=
 function filterGroupedByItemCategory(grouped, filterItemCategory) {
   if (filterItemCategory === 'all') return grouped
   return grouped.filter((g) => g.categoryValue === filterItemCategory)
+}
+
+function resolveGuideSuppliesSubsection(item) {
+  const refinedSub = String(item?.refinedSubCategory ?? '').trim()
+  const sub = String(item?.subCategory ?? '').trim()
+  const picked = refinedSub || sub
+  if (picked === 'clothing') return 'clothing'
+  if (picked === 'health') return 'health'
+  if (picked === 'toiletries') return 'toiletries'
+  if (picked === 'beauty') return 'beauty'
+  if (picked === 'electronics') return 'electronics'
+  if (picked === 'travel_goods' || picked === 'packing' || picked === 'activity') return 'travel_goods'
+  if (picked === 'essentials' || picked === 'documents') return 'essentials'
+
+  const rawId = String(item?.id ?? '')
+  const seg = rawId.split('-')[1]
+  if (seg && GUIDE_SUPPLIES_ID_PREFIX_TO_SUBSECTION[seg]) {
+    return GUIDE_SUPPLIES_ID_PREFIX_TO_SUBSECTION[seg]
+  }
+  return 'essentials'
+}
+
+function buildGuideSuppliesSubsections(carry, checked) {
+  return GUIDE_SUPPLIES_SUBSECTION_ORDER.map((key) => {
+    const carryItems = carry.filter((item) => resolveGuideSuppliesSubsection(item) === key)
+    const checkedItems = checked.filter((item) => resolveGuideSuppliesSubsection(item) === key)
+    return {
+      key,
+      label: GUIDE_SUPPLIES_SUBSECTION_LABEL[key],
+      items: [...carryItems, ...checkedItems],
+    }
+  }).filter((section) => section.items.length > 0)
 }
 
 const GUIDE_ARCHIVE_DROP_ANIMATION = {
@@ -121,6 +180,105 @@ export default function GuideArchiveChecklistView({ tripId, entry, onArchiveMuta
   useEffect(() => {
     setLocalItems(entry.items ?? [])
   }, [entryOrderSignature])
+
+  const reclassificationCandidatesSignature = useMemo(() => {
+    return (localItems ?? [])
+      .filter((it) => {
+        const baseCategory = String(it?.category ?? '')
+        if (!baseCategory || baseCategory === GUIDE_USER_DIRECT_CATEGORY) return false
+        return !String(it?.refinedCategory ?? '').trim()
+      })
+      .map((it) => `${String(it.id)}::${String(it.title ?? '')}::${String(it.category ?? '')}`)
+      .join('|')
+  }, [localItems])
+
+  useEffect(() => {
+    if (!reclassificationCandidatesSignature) return
+    const candidates = (localItems ?? []).filter((it) => {
+      const baseCategory = String(it?.category ?? '')
+      if (!baseCategory || baseCategory === GUIDE_USER_DIRECT_CATEGORY) return false
+      return !String(it?.refinedCategory ?? '').trim()
+    })
+    if (candidates.length === 0) return
+
+    let cancelled = false
+    ;(async () => {
+      try {
+        const response = await reclassifyGuideArchiveItems({
+          tripId: String(tripId),
+          entryId: String(entry.id),
+          items: candidates.map((it) => ({
+            id: String(it.id),
+            title: it.title ?? '',
+            description: it.description ?? '',
+            detail: it.detail ?? '',
+            category: it.category ?? '',
+            prepType: it.prepType ?? '',
+            subCategory: it.subCategory ?? '',
+          })),
+        })
+
+        const mapped = new Map(
+          (Array.isArray(response?.items) ? response.items : [])
+            .filter((row) => row && row.id != null)
+            .map((row) => [
+              String(row.id),
+              {
+                refinedCategory: String(row.category ?? '').trim(),
+                refinedSubCategory: String(row.subCategory ?? '').trim(),
+                refineConfidence:
+                  typeof row.confidence === 'number' && Number.isFinite(row.confidence)
+                    ? row.confidence
+                    : undefined,
+              },
+            ]),
+        )
+        if (mapped.size === 0 || cancelled) return
+
+        let changed = false
+        const refinedAt = new Date().toISOString()
+        const nextItems = localItems.map((it) => {
+          const key = String(it.id)
+          const hit = mapped.get(key)
+          if (!hit) return it
+          const nextRefinedCategory =
+            hit.refinedCategory || String(it.refinedCategory ?? '').trim() || String(it.category ?? '')
+          const nextRefinedSubCategory =
+            hit.refinedSubCategory || String(it.refinedSubCategory ?? '').trim() || undefined
+          const sameCategory = String(it.refinedCategory ?? '') === nextRefinedCategory
+          const sameSubCategory = String(it.refinedSubCategory ?? '') === String(nextRefinedSubCategory ?? '')
+          if (sameCategory && sameSubCategory) return it
+          changed = true
+          return {
+            ...it,
+            refinedCategory: nextRefinedCategory,
+            refinedSubCategory: nextRefinedSubCategory,
+            refineConfidence: hit.refineConfidence ?? it.refineConfidence,
+            refinedByModel: response?.model ?? it.refinedByModel,
+            refinedAt,
+          }
+        })
+
+        if (!changed || cancelled) return
+        patchGuideArchiveEntry(tripId, entry.id, {
+          items: nextItems,
+          checklistSavedAt: new Date().toISOString(),
+        })
+        setLocalItems(nextItems)
+        onArchiveMutated?.()
+      } catch (err) {
+        // 백엔드 미연결(404/501) 또는 일시 실패 시 기존 카테고리 렌더링으로 안전하게 유지
+        console.warn(
+          '[GuideArchiveChecklistView] 2차 분류 요청 실패(기존 분류 유지):',
+          err?.response?.data?.message || err?.message || err,
+        )
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [tripId, entry.id, reclassificationCandidatesSignature, localItems, onArchiveMutated])
 
   const items = localItems
   const activeDragItem = useMemo(
@@ -872,7 +1030,7 @@ export default function GuideArchiveChecklistView({ tripId, entry, onArchiveMuta
           보기 기준
         </p>
         <div
-          className="mb-5 flex w-full max-w-md rounded-2xl border-2 border-slate-200/90 bg-slate-100/80 p-1 shadow-inner"
+          className="mb-5 inline-flex w-auto max-w-full rounded-2xl border-2 border-slate-200/90 bg-slate-100/80 p-1 shadow-inner"
           role="tablist"
           aria-label="보기 기준"
           aria-labelledby="guide-checklist-view-basis-label"
@@ -886,7 +1044,7 @@ export default function GuideArchiveChecklistView({ tripId, entry, onArchiveMuta
                 role="tab"
                 aria-selected={selected}
                 onClick={() => setViewBasisAndReset(opt.value)}
-                className={`min-h-11 flex-1 rounded-xl px-3 py-2.5 text-center text-sm font-bold transition-all ${
+                className={`min-h-9 min-w-[92px] rounded-lg px-2 py-1.5 text-center text-xs font-bold transition-all ${
                   selected
                     ? 'bg-white text-teal-900 shadow-sm ring-1 ring-slate-200/80'
                     : 'text-slate-500 hover:text-slate-700'
@@ -1036,54 +1194,82 @@ export default function GuideArchiveChecklistView({ tripId, entry, onArchiveMuta
                       ) : null}
                     </div>
                     <section className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition md:p-5">
-                      <div className="space-y-6">
-                        {carry.length > 0 ? (
-                          <div>
-                            {showBagSublabels ? (
-                              <p className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-500">
-                                {BAGGAGE_SECTION_LABEL[BAGGAGE_CARRY_ON]}
-                              </p>
-                            ) : null}
-                            <GuideArchiveSectionDndList
-                              droppableId={buildGuideArchiveSectionDroppableId(
-                                BAGGAGE_CARRY_ON,
-                                categoryValue,
-                                categoryLabel,
-                              )}
-                              list={carry}
-                              sortableDisabled={dndLocked}
-                              checks={checks}
-                              handleToggle={handleToggle}
-                              onEditItem={openSectionEditorForSingleItem}
-                              onDeleteItem={confirmDeleteSingleItem}
-                              actionVariant="default"
-                            />
-                          </div>
-                        ) : null}
-                        {checked.length > 0 ? (
-                          <div className={carry.length > 0 ? 'border-t border-slate-100 pt-6' : ''}>
-                            {showBagSublabels ? (
-                              <p className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-500">
-                                {BAGGAGE_SECTION_LABEL[BAGGAGE_CHECKED]}
-                              </p>
-                            ) : null}
-                            <GuideArchiveSectionDndList
-                              droppableId={buildGuideArchiveSectionDroppableId(
-                                BAGGAGE_CHECKED,
-                                categoryValue,
-                                categoryLabel,
-                              )}
-                              list={checked}
-                              sortableDisabled={dndLocked}
-                              checks={checks}
-                              handleToggle={handleToggle}
-                              onEditItem={openSectionEditorForSingleItem}
-                              onDeleteItem={confirmDeleteSingleItem}
-                              actionVariant="default"
-                            />
-                          </div>
-                        ) : null}
-                      </div>
+                      {categoryValue === 'supplies' ? (
+                        <div className="space-y-5">
+                          {buildGuideSuppliesSubsections(carry, checked).map((subSection) => {
+                            return (
+                              <div key={subSection.key}>
+                                <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+                                  {subSection.label}
+                                </p>
+                                <GuideArchiveSectionDndList
+                                  droppableId={buildGuideArchiveSectionDroppableId(
+                                    BAGGAGE_CARRY_ON,
+                                    categoryValue,
+                                    categoryLabel,
+                                  )}
+                                  list={subSection.items}
+                                  sortableDisabled={dndLocked}
+                                  checks={checks}
+                                  handleToggle={handleToggle}
+                                  onEditItem={openSectionEditorForSingleItem}
+                                  onDeleteItem={confirmDeleteSingleItem}
+                                  actionVariant="default"
+                                />
+                              </div>
+                            )
+                          })}
+                        </div>
+                      ) : (
+                        <div className="space-y-6">
+                          {carry.length > 0 ? (
+                            <div>
+                              {showBagSublabels ? (
+                                <p className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-500">
+                                  {BAGGAGE_SECTION_LABEL[BAGGAGE_CARRY_ON]}
+                                </p>
+                              ) : null}
+                              <GuideArchiveSectionDndList
+                                droppableId={buildGuideArchiveSectionDroppableId(
+                                  BAGGAGE_CARRY_ON,
+                                  categoryValue,
+                                  categoryLabel,
+                                )}
+                                list={carry}
+                                sortableDisabled={dndLocked}
+                                checks={checks}
+                                handleToggle={handleToggle}
+                                onEditItem={openSectionEditorForSingleItem}
+                                onDeleteItem={confirmDeleteSingleItem}
+                                actionVariant="default"
+                              />
+                            </div>
+                          ) : null}
+                          {checked.length > 0 ? (
+                            <div className={carry.length > 0 ? 'border-t border-slate-100 pt-6' : ''}>
+                              {showBagSublabels ? (
+                                <p className="mb-3 text-xs font-bold uppercase tracking-wide text-slate-500">
+                                  {BAGGAGE_SECTION_LABEL[BAGGAGE_CHECKED]}
+                                </p>
+                              ) : null}
+                              <GuideArchiveSectionDndList
+                                droppableId={buildGuideArchiveSectionDroppableId(
+                                  BAGGAGE_CHECKED,
+                                  categoryValue,
+                                  categoryLabel,
+                                )}
+                                list={checked}
+                                sortableDisabled={dndLocked}
+                                checks={checks}
+                                handleToggle={handleToggle}
+                                onEditItem={openSectionEditorForSingleItem}
+                                onDeleteItem={confirmDeleteSingleItem}
+                                actionVariant="default"
+                              />
+                            </div>
+                          ) : null}
+                        </div>
+                      )}
                     </section>
                   </div>
                 )
@@ -1117,7 +1303,7 @@ export default function GuideArchiveChecklistView({ tripId, entry, onArchiveMuta
                             className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition md:p-5"
                           >
                             <div className="mb-3 border-b border-teal-100/90 pb-2">
-                              <h3 className="flex min-w-0 items-center gap-2 text-base font-extrabold tracking-tight text-[#0a3d3d]">
+                              <h3 className="flex min-w-0 items-center gap-2 text-xs font-bold uppercase tracking-wide text-slate-500">
                                 {categoryLabel}
                               </h3>
                             </div>

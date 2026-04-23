@@ -18,12 +18,6 @@ import {
   TRIP_SEARCH_MERGE_PAGE_BACKGROUND_STYLE,
 } from '@/utils/tripMintPageBackground'
 import GuideArchiveProgressBar from '@/components/guide/GuideArchiveProgressBar'
-import {
-  BAGGAGE_CARRY_ON,
-  BAGGAGE_CHECKED,
-  BAGGAGE_SECTION_LABEL,
-  resolveBaggageSection,
-} from '@/utils/guideArchiveBaggage'
 import aiSparklesImg from '@/assets/ai-sparkles.png'
 
 /**
@@ -35,13 +29,38 @@ import aiSparklesImg from '@/assets/ai-sparkles.png'
  */
 const PLACEHOLDER_TRIP_ID = '1'
 
-/** 목록은 항상 기내 → 위탁 두 블록으로만 나눔(카드 상단 수하물 탭 없음) */
-const SEARCH_BAGGAGE_SECTION_ORDER = [BAGGAGE_CARRY_ON, BAGGAGE_CHECKED]
 const SEARCH_CATEGORY_ORDER = ['supplies', 'prebooking', 'predeparture']
 const SEARCH_CATEGORY_LABEL = {
   supplies: '준비물',
   prebooking: '사전 예약/신청',
   predeparture: '출국 전 확인사항',
+}
+const SUPPLIES_SUBSECTION_ORDER = [
+  'essentials',
+  'clothing',
+  'health',
+  'toiletries',
+  'beauty',
+  'electronics',
+  'travel_goods',
+]
+const SUPPLIES_SUBSECTION_LABEL = {
+  essentials: '필수 준비물',
+  clothing: '입을 옷',
+  health: '상비약',
+  toiletries: '세면도구',
+  beauty: '미용용품',
+  electronics: '전자제품',
+  travel_goods: '여행용품',
+}
+const SUPPLIES_ID_PREFIX_TO_SUBSECTION = {
+  doc: 'essentials',
+  clo: 'clothing',
+  hl: 'health',
+  pk: 'toiletries',
+  bty: 'beauty',
+  ele: 'electronics',
+  act: 'travel_goods',
 }
 
 /** 현재 풀 안에서 항목 유형(AI·준비물…)별 그룹 — 보관함 상세와 같이 수하물 블록 안에서 재사용 */
@@ -79,6 +98,29 @@ function sortItemsForDisplay(a, b) {
   const bAi = Boolean(b?.isAiRecommended)
   if (aAi !== bAi) return aAi ? -1 : 1
   return String(a?.title ?? '').localeCompare(String(b?.title ?? ''), 'ko')
+}
+
+function resolveSuppliesSubsection(item) {
+  const sub = String(item?.subCategory ?? '').trim()
+  if (sub === 'clothing') return 'clothing'
+  if (sub === 'health') return 'health'
+  if (sub === 'toiletries') return 'toiletries'
+  if (sub === 'beauty') return 'beauty'
+  if (sub === 'electronics') return 'electronics'
+  if (sub === 'travel_goods' || sub === 'packing' || sub === 'activity') return 'travel_goods'
+  if (sub === 'essentials' || sub === 'documents') return 'essentials'
+
+  const rawId = String(item?.id ?? '')
+  const seg = rawId.split('-')[1]
+  if (seg && SUPPLIES_ID_PREFIX_TO_SUBSECTION[seg]) return SUPPLIES_ID_PREFIX_TO_SUBSECTION[seg]
+  return 'essentials'
+}
+
+function buildSuppliesSubsections(items) {
+  return SUPPLIES_SUBSECTION_ORDER.map((key) => {
+    const list = items.filter((item) => resolveSuppliesSubsection(item) === key).sort(sortItemsForDisplay)
+    return { key, label: SUPPLIES_SUBSECTION_LABEL[key], items: list }
+  }).filter((section) => section.items.length > 0)
 }
 
 const trackEvent = (eventName, properties = {}) => {
@@ -125,6 +167,10 @@ function mapMockItemToArchiveItem(i) {
     baggageType: i.baggageType,
     category: i.category,
     categoryLabel: i.categoryLabel,
+    subCategory: i.subCategory ?? '',
+    subCategoryLabel: i.subCategoryLabel ?? '',
+    prepType: i.prepType ?? '',
+    source: i.source ?? '',
     title: i.title,
     description: i.description,
     detail: i.detail,
@@ -493,6 +539,10 @@ function TripSearchInner({ tripId }) {
         baggageType: i.baggageType,
         category: i.category,
         categoryLabel: i.categoryLabel,
+        subCategory: i.subCategory ?? '',
+        subCategoryLabel: i.subCategoryLabel ?? '',
+        prepType: i.prepType ?? '',
+        source: i.source ?? '',
         title: i.title,
         description: i.description,
         detail: i.detail,
@@ -533,31 +583,19 @@ function TripSearchInner({ tripId }) {
     (i) => i.category === 'ai_recommend' || i.prepType === 'ai_recommend' || i.source === 'llm',
   ).length
 
-  /** 수하물 구간별 → 항목 유형별 그룹(목록에서는 기내/위탁 블록만 유지) */
-  const groupedItemsByBaggage = useMemo(() => {
-    return SEARCH_BAGGAGE_SECTION_ORDER.map((bagKey) => {
-      const pool = sourceItems.filter((i) => resolveBaggageSection(i) === bagKey)
-      const grouped = buildSubcategoryGroups(pool)
-      return { bagKey, bagTitle: BAGGAGE_SECTION_LABEL[bagKey], grouped }
-    }).filter((section) => section.grouped.length > 0)
-  }, [sourceItems])
+  /** 전체 탭: 카테고리별 그룹(수하물 구간 분리 없음) */
+  const groupedItemsByCategory = useMemo(() => buildSubcategoryGroups(sourceItems), [sourceItems])
 
-  /** 단일 서브 카테고리: 수하물 구간별 목록(기내 / 위탁 분리) */
-  const singleCategoryBaggageSections = useMemo(() => {
+  /** 단일 카테고리 탭: 해당 카테고리 아이템 목록 */
+  const singleCategoryItems = useMemo(() => {
     if (selectedCategory === 'all') return []
-    return SEARCH_BAGGAGE_SECTION_ORDER.map((bagKey) => ({
-      bagKey,
-      bagTitle: BAGGAGE_SECTION_LABEL[bagKey],
-      items: sourceItems
-        .filter((i) => resolveBaggageSection(i) === bagKey && i.category === selectedCategory)
-        .sort(sortItemsForDisplay),
-    })).filter((s) => s.items.length > 0)
+    return sourceItems.filter((i) => i.category === selectedCategory).sort(sortItemsForDisplay)
   }, [selectedCategory, sourceItems])
 
   const sortedItemsSingleCategory = useMemo(() => {
     if (selectedCategory === 'all') return []
-    return singleCategoryBaggageSections.flatMap((s) => s.items)
-  }, [selectedCategory, singleCategoryBaggageSections])
+    return singleCategoryItems
+  }, [selectedCategory, singleCategoryItems])
 
   const visibleItemCount = selectedCategory === 'all' ? sourceItems.length : sortedItemsSingleCategory.length
 
@@ -795,112 +833,98 @@ function TripSearchInner({ tripId }) {
             </div>
           ) : selectedCategory === 'all' ? (
             <div className="space-y-10">
-              {groupedItemsByBaggage.length === 0 ? (
+              {groupedItemsByCategory.length === 0 ? (
                 <div className="rounded-2xl border border-gray-100 bg-white py-16 text-center text-sm text-gray-500 shadow-sm">
                   표시할 항목이 없습니다.
                 </div>
               ) : null}
-              {groupedItemsByBaggage.map(({ bagKey, bagTitle, grouped }) => (
-                <div key={bagKey} className="space-y-6">
-                  <div className="flex flex-col gap-2 border-b border-teal-100/90 pb-2 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
-                    <h2 className="text-base font-extrabold tracking-tight text-[#0a3d3d]">{bagTitle}</h2>
-                  </div>
-                  <div className="space-y-8">
-                    {grouped.map((group) => {
-                      const selectableInGroup = group.items.filter(
-                        (i) => !existingArchiveItemIds.has(String(i.id)),
-                      )
-                      const allInGroupSelected =
-                        selectableInGroup.length > 0 &&
-                        selectableInGroup.every((i) => selectedForSave.has(String(i.id)))
-                      const isAiGroup = group.categoryValue === 'ai_recommend'
-                      return (
-                        <div
-                          key={`${bagKey}-${group.categoryValue}`}
-                          className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm md:p-5"
-                        >
-                          <div
-                            className={`mb-3 flex flex-wrap items-center justify-between gap-2 border-b pb-2 ${
-                              isAiGroup ? 'border-violet-200/90' : 'border-teal-100/90'
-                            }`}
-                          >
-                            <h3
-                              className={`flex min-w-0 items-center gap-2 text-base font-extrabold tracking-tight ${
-                                isAiGroup ? 'text-violet-950' : 'text-[#0a3d3d]'
-                              }`}
-                            >
-                              {isAiGroup ? <AiSparkleMaskIcon selected={false} className="h-4 w-4 shrink-0" /> : null}
-                              {group.categoryLabel}
-                            </h3>
-                            <button
-                              type="button"
-                              onClick={() => handleToggleSelectAllInGroup(group)}
-                              disabled={selectableInGroup.length === 0}
-                              className={`shrink-0 rounded-lg border bg-white px-2.5 py-1.5 text-xs font-bold shadow-sm transition-colors disabled:pointer-events-none disabled:opacity-40 sm:text-sm sm:px-3 ${
-                                isAiGroup
-                                  ? 'border-violet-200 text-violet-900 hover:bg-violet-50'
-                                  : 'border-sky-200 text-sky-800 hover:bg-sky-50'
-                              }`}
-                            >
-                              {allInGroupSelected ? '전체 해제' : '전체 선택'}
-                              <span
-                                className={`ml-1 font-semibold tabular-nums ${
-                                  isAiGroup ? 'text-violet-600' : 'text-sky-600'
-                                }`}
-                              >
-                                ({selectableInGroup.length})
-                              </span>
-                            </button>
+              {groupedItemsByCategory.map((group) => {
+                const selectableInGroup = group.items.filter(
+                  (i) => !existingArchiveItemIds.has(String(i.id)),
+                )
+                const allInGroupSelected =
+                  selectableInGroup.length > 0 &&
+                  selectableInGroup.every((i) => selectedForSave.has(String(i.id)))
+                const suppliesSubsections =
+                  group.categoryValue === 'supplies' ? buildSuppliesSubsections(group.items) : []
+                return (
+                  <div
+                    key={group.categoryValue}
+                    className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm md:p-5"
+                  >
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-teal-100/90 pb-2">
+                      <h3 className="flex min-w-0 items-center gap-2 text-base font-extrabold tracking-tight text-[#0a3d3d]">
+                        {group.categoryLabel}
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => handleToggleSelectAllInGroup(group)}
+                        disabled={selectableInGroup.length === 0}
+                        className="shrink-0 rounded-lg border border-sky-200 bg-white px-2.5 py-1.5 text-xs font-bold text-sky-800 shadow-sm transition-colors hover:bg-sky-50 disabled:pointer-events-none disabled:opacity-40 sm:px-3 sm:text-sm"
+                      >
+                        {allInGroupSelected ? '전체 해제' : '전체 선택'}
+                        <span className="ml-1 font-semibold text-sky-600 tabular-nums">({selectableInGroup.length})</span>
+                      </button>
+                    </div>
+                    {group.categoryValue === 'supplies' ? (
+                      <div className="space-y-5">
+                        {suppliesSubsections.map((section) => (
+                          <div key={section.key}>
+                            <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+                              {section.label}
+                            </p>
+                            <div className="flex flex-col gap-3">
+                              {section.items.map((item) => (
+                                <SearchResultItem
+                                  key={item.id}
+                                  item={item}
+                                  aiRecommended={Boolean(item.isAiRecommended)}
+                                  selected={selectedForSave.has(String(item.id))}
+                                  inArchiveAlready={existingArchiveItemIds.has(String(item.id))}
+                                  onToggle={() => toggleItemSelect(item)}
+                                />
+                              ))}
+                            </div>
                           </div>
-                          <div className="flex flex-col gap-3">
-                            {group.items.map((item) => (
-                              <SearchResultItem
-                                key={item.id}
-                                item={item}
-                                aiRecommended={Boolean(item.isAiRecommended)}
-                                selected={selectedForSave.has(String(item.id))}
-                                inArchiveAlready={existingArchiveItemIds.has(String(item.id))}
-                                onToggle={() => toggleItemSelect(item)}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      )
-                    })}
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-3">
+                        {group.items.map((item) => (
+                          <SearchResultItem
+                            key={item.id}
+                            item={item}
+                            aiRecommended={Boolean(item.isAiRecommended)}
+                            selected={selectedForSave.has(String(item.id))}
+                            inArchiveAlready={existingArchiveItemIds.has(String(item.id))}
+                            onToggle={() => toggleItemSelect(item)}
+                          />
+                        ))}
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           ) : (
             <>
-              {singleCategoryBaggageSections.length === 0 ? (
+              {singleCategoryItems.length === 0 ? (
                 <div className="py-16 text-center text-sm text-gray-400">해당 카테고리에 항목이 없습니다.</div>
-              ) : (
-                <div className="space-y-10">
-                  {singleCategoryBaggageSections.map(({ bagKey, bagTitle, items }) => (
-                    <div key={bagKey} className="space-y-6">
-                      <div className="flex flex-col gap-2 border-b border-teal-100/90 pb-2 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
-                        <h2 className="text-base font-extrabold tracking-tight text-[#0a3d3d]">{bagTitle}</h2>
-                      </div>
-                      <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm md:p-5">
-                        <div
-                          className={`mb-3 border-b pb-2 ${
-                            selectedCategory === 'ai_recommend' ? 'border-violet-200/90' : 'border-teal-100/90'
-                          }`}
-                        >
-                          <h3
-                            className={`flex items-center gap-2 text-base font-extrabold tracking-tight ${
-                              selectedCategory === 'ai_recommend' ? 'text-violet-950' : 'text-[#0a3d3d]'
-                            }`}
-                          >
-                            {selectedCategory === 'ai_recommend' ? (
-                              <AiSparkleMaskIcon selected={false} className="h-4 w-4 shrink-0" />
-                            ) : null}
-                            {tabCategories.find((c) => c.value === selectedCategory)?.label ?? '준비물'}
-                          </h3>
-                        </div>
+              ) : selectedCategory === 'supplies' ? (
+                <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm md:p-5">
+                  <div className="mb-3 border-b border-teal-100/90 pb-2">
+                    <h3 className="flex items-center gap-2 text-base font-extrabold tracking-tight text-[#0a3d3d]">
+                      {tabCategories.find((c) => c.value === selectedCategory)?.label ?? '준비물'}
+                    </h3>
+                  </div>
+                  <div className="space-y-5">
+                    {buildSuppliesSubsections(singleCategoryItems).map((section) => (
+                      <div key={section.key}>
+                        <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+                          {section.label}
+                        </p>
                         <div className="flex flex-col gap-3">
-                          {items.map((item) => (
+                          {section.items.map((item) => (
                             <SearchResultItem
                               key={item.id}
                               item={item}
@@ -912,8 +936,28 @@ function TripSearchInner({ tripId }) {
                           ))}
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm md:p-5">
+                  <div className="mb-3 border-b border-teal-100/90 pb-2">
+                    <h3 className="flex items-center gap-2 text-base font-extrabold tracking-tight text-[#0a3d3d]">
+                      {tabCategories.find((c) => c.value === selectedCategory)?.label ?? '준비물'}
+                    </h3>
+                  </div>
+                  <div className="flex flex-col gap-3">
+                    {singleCategoryItems.map((item) => (
+                      <SearchResultItem
+                        key={item.id}
+                        item={item}
+                        aiRecommended={Boolean(item.isAiRecommended)}
+                        selected={selectedForSave.has(String(item.id))}
+                        inArchiveAlready={existingArchiveItemIds.has(String(item.id))}
+                        onToggle={() => toggleItemSelect(item)}
+                      />
+                    ))}
+                  </div>
                 </div>
               )}
             </>
@@ -1036,18 +1080,22 @@ function SearchResultItem({ item, selected, onToggle, inArchiveAlready = false, 
   const subtitleText = item.description || item.detail || ''
 
   if (inArchiveAlready) {
+    const archivedShellClass = aiRecommended
+      ? 'w-full rounded-2xl border-2 border-violet-200 bg-violet-50/60 p-4 text-left shadow-sm'
+      : 'w-full rounded-2xl border-2 border-gray-200 bg-white p-4 text-left shadow-sm'
+    const archivedCheckClass = aiRecommended
+      ? 'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 border-violet-300 bg-violet-100'
+      : 'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 border-amber-300 bg-amber-100'
+    const archivedCheckIconClass = aiRecommended ? 'h-3 w-3 text-violet-800' : 'h-3 w-3 text-amber-800'
     return (
       <div
-        className={`w-full rounded-2xl border-2 border-gray-200 bg-white p-4 text-left shadow-sm ${className}`.trim()}
+        className={`${archivedShellClass} ${className}`.trim()}
         role="group"
         aria-label="이미 이 체크리스트에 담긴 항목"
       >
         <div className="flex gap-3">
-          <span
-            className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded border-2 border-amber-300 bg-amber-100"
-            aria-hidden
-          >
-            <svg className="h-3 w-3 text-amber-800" viewBox="0 0 12 12" fill="none" aria-hidden>
+          <span className={archivedCheckClass} aria-hidden>
+            <svg className={archivedCheckIconClass} viewBox="0 0 12 12" fill="none" aria-hidden>
               <path
                 d="M2.5 6.2 5 8.7 9.5 3.3"
                 stroke="currentColor"
@@ -1061,8 +1109,9 @@ function SearchResultItem({ item, selected, onToggle, inArchiveAlready = false, 
             <p className="flex flex-wrap items-center gap-2">
               <span className="text-[15px] font-extrabold leading-snug text-gray-900">{item.title}</span>
               {aiRecommended ? (
-                <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-violet-800">
-                  AI 추천
+                <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold tracking-wide text-violet-800">
+                  <AiSparkleMaskIcon selected={false} className="h-3 w-3" />
+                  MATE 추천
                 </span>
               ) : null}
               <span
@@ -1119,8 +1168,9 @@ function SearchResultItem({ item, selected, onToggle, inArchiveAlready = false, 
           <p className="flex flex-wrap items-center gap-2 text-[15px] font-extrabold leading-snug text-gray-900">
             <span>{item.title}</span>
             {aiRecommended ? (
-              <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-violet-800">
-                AI 추천
+              <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold tracking-wide text-violet-800">
+                <AiSparkleMaskIcon selected={false} className="h-3 w-3" />
+                MATE 추천
               </span>
             ) : null}
           </p>

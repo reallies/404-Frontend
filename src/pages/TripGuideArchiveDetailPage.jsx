@@ -4,6 +4,9 @@ import { getGuideArchiveEntry } from '@/utils/guideArchiveStorage'
 import GuideArchiveChecklistView from '@/components/guide/GuideArchiveChecklistView'
 import { TRIP_GUIDE_ARCHIVE_PAGE_BACKGROUND_STYLE } from '@/utils/tripMintPageBackground'
 
+const DESIGN_AI_DEMO_ENTRY_ID = 'ga-1776938639563-jvmruzv'
+const DESIGN_AI_DEMO_ITEM_ID = 'ga-mock-ai-recommend-1'
+
 /**
  * 라우트: /trips/:id/guide-archive/:entryId
  * - 목록(TripGuideArchivePage)에서 저장된 여행 스냅샷을 누르면 진입
@@ -18,8 +21,33 @@ function TripGuideArchiveDetailInner({ tripId, entryId }) {
     () => getGuideArchiveEntry(tripId, entryId),
     [tripId, entryId, archiveRevision],
   )
+  const entryForView = useMemo(() => {
+    if (!entry) return entry
+    if (String(entry.id) !== DESIGN_AI_DEMO_ENTRY_ID) return entry
+    const alreadyExists = (entry.items ?? []).some((it) => String(it.id) === DESIGN_AI_DEMO_ITEM_ID)
+    if (alreadyExists) return entry
+    const aiDemoItem = {
+      id: DESIGN_AI_DEMO_ITEM_ID,
+      category: 'supplies',
+      categoryLabel: '준비물',
+      refinedCategory: 'supplies',
+      refinedSubCategory: 'essentials',
+      subCategory: 'essentials',
+      subCategoryLabel: '필수 준비물',
+      source: 'llm',
+      prepType: 'ai_recommend',
+      title: '멀티 어댑터(AI 맞춤 추천)',
+      description: '숙소 및 카페 콘센트 형태를 고려해 AI가 추천한 준비물입니다.',
+      detail: '국가별 플러그 타입을 확인하고 USB-C 고속충전 포트 포함 제품을 권장합니다.',
+      baggageType: 'carry_on',
+    }
+    return {
+      ...entry,
+      items: [aiDemoItem, ...(entry.items ?? [])],
+    }
+  }, [entry])
 
-  if (!entry) {
+  if (!entryForView) {
     return (
       <div
         className="min-h-screen flex flex-col items-center justify-center px-4"
@@ -38,7 +66,7 @@ function TripGuideArchiveDetailInner({ tripId, entryId }) {
     )
   }
 
-  if (String(entry.id).startsWith('demo-design-')) {
+  if (String(entryForView.id).startsWith('demo-design-')) {
     return (
       <div
         className="min-h-screen flex flex-col items-center justify-center px-4"
@@ -71,7 +99,7 @@ function TripGuideArchiveDetailInner({ tripId, entryId }) {
       </div>
       <GuideArchiveChecklistView
         tripId={tripId}
-        entry={entry}
+        entry={entryForView}
         onArchiveMutated={() => setArchiveRevision((n) => n + 1)}
       />
     </div>

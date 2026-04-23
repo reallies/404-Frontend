@@ -28,7 +28,7 @@ export default function GuideArchiveSectionDndList({
     <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
       <ul
         ref={setNodeRef}
-        className={`space-y-2 rounded-xl transition-[background-color,box-shadow] duration-300 ease-out ${
+        className={`space-y-2 rounded-xl transition-[background-color,box-shadow] duration-300 ease-out md:pl-10 ${
           list.length === 0
             ? 'min-h-14 border-2 border-dashed border-sky-200/70 bg-white py-2'
             : ''

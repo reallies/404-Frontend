@@ -16,15 +16,17 @@ export const GUIDE_ARCHIVE_LEGACY_AI_CATEGORY = 'ai_recommend'
  * @returns {string}
  */
 export function resolveGuideArchiveCategoryForSection(item) {
-  const c = item?.category ?? '_misc'
+  const c = item?.refinedCategory ?? item?.category ?? '_misc'
   if (c === GUIDE_ARCHIVE_LEGACY_AI_CATEGORY) return 'supplies'
   return c
 }
 
 /** 목록 표시: `ai_recommend` 항목을 같은 섹션 안에서 항상 위쪽에 */
 export function compareGuideArchiveAiFirst(a, b) {
-  const aAi = (a?.category ?? '_misc') === GUIDE_ARCHIVE_LEGACY_AI_CATEGORY ? 0 : 1
-  const bAi = (b?.category ?? '_misc') === GUIDE_ARCHIVE_LEGACY_AI_CATEGORY ? 0 : 1
+  const aBase = a?.category ?? '_misc'
+  const bBase = b?.category ?? '_misc'
+  const aAi = aBase === GUIDE_ARCHIVE_LEGACY_AI_CATEGORY || a?.source === 'llm' ? 0 : 1
+  const bAi = bBase === GUIDE_ARCHIVE_LEGACY_AI_CATEGORY || b?.source === 'llm' ? 0 : 1
   return aAi - bAi
 }
 
@@ -153,6 +155,8 @@ export function moveItemAppendToSection(
     ...it,
     category: targetCategoryValue,
     categoryLabel: targetCategoryLabel,
+    refinedCategory: targetCategoryValue,
+    refinedAt: new Date().toISOString(),
     baggageType: targetBagKey === BAGGAGE_CHECKED ? BAGGAGE_CHECKED : BAGGAGE_CARRY_ON,
   }
 
@@ -198,6 +202,8 @@ export function moveItemAppendToDirectSection(allItems, itemId) {
     ...it,
     category: GUIDE_USER_DIRECT_CATEGORY,
     categoryLabel: GUIDE_USER_DIRECT_SECTION_LABEL,
+    refinedCategory: GUIDE_USER_DIRECT_CATEGORY,
+    refinedAt: new Date().toISOString(),
     baggageType: BAGGAGE_CARRY_ON,
   }
 
@@ -233,6 +239,8 @@ export function moveItemInsertIntoSection(
     ...it,
     category: targetCategoryValue,
     categoryLabel: targetCategoryLabel,
+    refinedCategory: targetCategoryValue,
+    refinedAt: new Date().toISOString(),
     baggageType: targetBagKey === BAGGAGE_CHECKED ? BAGGAGE_CHECKED : BAGGAGE_CARRY_ON,
   }
 
@@ -291,6 +299,8 @@ export function moveItemInsertIntoDirectSection(allItems, itemId, insertBeforeId
     ...it,
     category: GUIDE_USER_DIRECT_CATEGORY,
     categoryLabel: GUIDE_USER_DIRECT_SECTION_LABEL,
+    refinedCategory: GUIDE_USER_DIRECT_CATEGORY,
+    refinedAt: new Date().toISOString(),
     baggageType: BAGGAGE_CARRY_ON,
   }
 
