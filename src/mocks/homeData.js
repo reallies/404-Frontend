@@ -36,7 +36,7 @@ export const FOOTER_SECTIONS = [
 
 export const FOOTER_SOCIAL_LINKS = [
   { label: 'LinkedIn', href: '#', icon: 'linkedin' },
-  { label: 'Instagram', href: '#', icon: 'instagram' },
+  { label: 'Instagram', href: 'https://www.instagram.com/checkmate._.v/', icon: 'instagram' },
 ]
 
 export const LANDING_SECTION_IDS = {

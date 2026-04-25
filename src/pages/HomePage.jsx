@@ -674,15 +674,28 @@ function HomePage() {
           <div className="mt-10 flex flex-col items-center justify-between gap-4 border-t border-gray-200/80 pt-8 md:flex-row">
             <div className="flex items-center gap-4 text-gray-500">
               {FOOTER_SOCIAL_LINKS.map((s) => (
-                <button
-                  key={s.label}
-                  type="button"
-                  onClick={noopFooterAction}
-                  aria-label={s.label}
-                  className="cursor-pointer border-0 bg-transparent p-0 text-gray-500 transition-colors hover:text-teal-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-1"
-                >
-                  <SocialIcon icon={s.icon} />
-                </button>
+                s.href && s.href !== '#' ? (
+                  <a
+                    key={s.label}
+                    href={s.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={s.label}
+                    className="cursor-pointer border-0 bg-transparent p-0 text-gray-500 transition-colors hover:text-teal-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-1"
+                  >
+                    <SocialIcon icon={s.icon} />
+                  </a>
+                ) : (
+                  <button
+                    key={s.label}
+                    type="button"
+                    onClick={noopFooterAction}
+                    aria-label={s.label}
+                    className="cursor-pointer border-0 bg-transparent p-0 text-gray-500 transition-colors hover:text-teal-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-1"
+                  >
+                    <SocialIcon icon={s.icon} />
+                  </button>
+                )
               ))}
             </div>
             <LegalFooterLinks
